@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import type { View } from '@/entities/view'
-import { Button, cn } from '@/shared/ui'
+import { Button, cn, rise } from '@/shared/ui'
 
 export function ViewCard({
   view,
@@ -23,10 +23,8 @@ export function ViewCard({
   const [confirming, setConfirming] = useState(false)
   return (
     <motion.li
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      layout="position"
+      {...rise}
       className={cn(
         'overflow-hidden rounded-xl border bg-surface',
         isCurrent ? 'border-free' : 'border-line',

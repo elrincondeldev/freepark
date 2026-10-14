@@ -6,11 +6,13 @@ import { ApiError } from '@/shared/api'
 export function useZones(viewId: number) {
   const [zones, setZones] = useState<Zone[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   const reload = useCallback(async () => {
     try {
       setZones(await zoneApi.list(viewId))
       setLoadError(null)
+      setLoaded(true)
     } catch {
       setLoadError('Could not load zones.')
     }
@@ -47,5 +49,5 @@ export function useZones(viewId: number) {
     [reload],
   )
 
-  return { zones, loadError, save, remove }
+  return { zones, loaded, loadError, save, remove }
 }

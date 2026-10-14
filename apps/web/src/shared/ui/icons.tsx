@@ -58,3 +58,14 @@ export const MuteIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="m22 9-6 6M16 9l6 6" />
   </svg>
 )
+export const RefreshIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" />
+    <path d="M21 3v5h-5" />
+  </svg>
+)
+export const ArrowLeftIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="M19 12H5M12 19l-7-7 7-7" />
+  </svg>
+)

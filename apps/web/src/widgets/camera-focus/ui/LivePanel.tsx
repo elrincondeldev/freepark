@@ -6,6 +6,7 @@ import {
   type DisplayedAnalysis,
   type DisplayStatus,
 } from '@/entities/feed'
+import { ReanalyzeButton } from '@/features/reanalyze-camera'
 import { AlertsSwitch } from '@/features/toggle-camera-alerts'
 import { formatAgo } from '@/shared/lib'
 import { Button, Switch } from '@/shared/ui'
@@ -40,19 +41,22 @@ export function LivePanel({
       </div>
 
       <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80">
-        <div className="text-sm text-muted">
-          {feed?.lastFrameAt
-            ? `Image updated ${formatAgo(now - feed.lastFrameAt)}`
-            : 'Waiting for image…'}
-          {current?.viewName && (
-            <>
-              {' · '}
-              <span className="text-ink">{current.viewName}</span>
-              {current.viewConfidence !== null && (
-                <span> ({Math.round(current.viewConfidence * 100)}% match)</span>
-              )}
-            </>
-          )}
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-sm text-muted">
+            {feed?.lastFrameAt
+              ? `Image updated ${formatAgo(now - feed.lastFrameAt)}`
+              : 'Waiting for image…'}
+            {current?.viewName && (
+              <>
+                {' · '}
+                <span className="text-ink">{current.viewName}</span>
+                {current.viewConfidence !== null && (
+                  <span> ({Math.round(current.viewConfidence * 100)}% match)</span>
+                )}
+              </>
+            )}
+          </div>
+          <ReanalyzeButton cameraId={camera.id} />
         </div>
 
         {status === 'unknown_view' && (

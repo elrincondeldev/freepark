@@ -12,6 +12,8 @@ export interface CameraFeed {
   lastFrameAt?: number
   /** recent gaps between source capture times (ms), to estimate the update cadence */
   gaps: number[]
+  /** a re-analysis was requested and its result has not arrived yet */
+  reanalysing?: boolean
 }
 
 interface FeedState {
@@ -20,13 +22,17 @@ interface FeedState {
   setConnection: (c: ConnectionState) => void
   handle: (msg: ServerMessage, now?: number) => void
   forget: (cameraId: string) => void
+  /** Mark a camera as being re-analysed until its next analysis (or a timeout). */
+  markReanalysing: (cameraId: string) => void
+  cancelReanalysing: (cameraId: string) => void
 }
 
 const MAX_GAPS = 6
 const MIN_INTERVAL_MS = 30_000
+const REANALYSE_TIMEOUT_MS = 45_000
 const empty = (): CameraFeed => ({ online: true, gaps: [] })
 
-export const useFeedStore = create<FeedState>()((set) => ({
+export const useFeedStore = create<FeedState>()((set, get) => ({
   connection: 'connecting',
   cameras: {},
   setConnection: (connection) => set({ connection }),
@@ -36,6 +42,15 @@ export const useFeedStore = create<FeedState>()((set) => ({
       delete next[cameraId]
       return { cameras: next }
     }),
+  markReanalysing: (cameraId) => {
+    set((s) => withFlag(s, cameraId, true))
+    const marked = get().cameras[cameraId]?.analysis
+    setTimeout(() => {
+      // nothing arrived (camera unwatched, API restarted…): stop showing progress
+      if (get().cameras[cameraId]?.analysis === marked) set((s) => withFlag(s, cameraId, false))
+    }, REANALYSE_TIMEOUT_MS)
+  },
+  cancelReanalysing: (cameraId) => set((s) => withFlag(s, cameraId, false)),
   handle: (msg, now = Date.now()) =>
     set((s) => {
       if (msg.type !== 'frame' && msg.type !== 'analysis' && msg.type !== 'camera_status') return s
@@ -44,11 +59,17 @@ export const useFeedStore = create<FeedState>()((set) => ({
         msg.type === 'frame'
           ? onFrame(prev, msg, now)
           : msg.type === 'analysis'
-            ? { ...prev, analysis: msg }
+            ? { ...prev, analysis: msg, reanalysing: false }
             : onStatus(prev, msg)
       return next === prev ? s : { cameras: { ...s.cameras, [msg.cameraId]: next } }
     }),
 }))
+
+function withFlag(s: FeedState, cameraId: string, reanalysing: boolean): Partial<FeedState> {
+  const prev = s.cameras[cameraId]
+  if (!prev || !!prev.reanalysing === reanalysing) return s
+  return { cameras: { ...s.cameras, [cameraId]: { ...prev, reanalysing } } }
+}
 
 function onFrame(prev: CameraFeed, msg: FrameMessage, now: number): CameraFeed {
   if (prev.frame?.frameId === msg.frameId) return prev

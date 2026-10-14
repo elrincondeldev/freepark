@@ -87,3 +87,19 @@ def test_cors_allows_configured_origin(client):
         headers={"Origin": "http://evil.test", "Access-Control-Request-Method": "GET"},
     )
     assert "access-control-allow-origin" not in resp.headers
+
+
+@respx.mock
+def test_reanalyze_requeues_latest_frame(client):
+    respx.get("https://cams.test/cam.php?id=47").respond(
+        200, content=JPEG, headers={"Last-Modified": LM}
+    )
+    assert client.post("/api/cameras/47/reanalyze").status_code == 409  # not watched
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "subscribe", "cameras": ["47"]})
+        first = receive_until(ws, "analysis")
+        resp = client.post("/api/cameras/47/reanalyze", params={"fresh": "true"})
+        assert resp.status_code == 202 and resp.json()["fresh"] is True
+        second = receive_until(ws, "analysis")
+        assert second["frameId"] == first["frameId"]
+        assert second["analysedAt"] > first["analysedAt"]

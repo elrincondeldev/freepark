@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { cn } from '@/shared/ui'
 import { STATUS_META, type DisplayStatus } from '../model/status'
 
 const TONE: Record<string, string> = {
@@ -12,21 +12,20 @@ const TONE: Record<string, string> = {
 export function FeedStatusBadge({ status }: { status: DisplayStatus }) {
   const meta = STATUS_META[status]
   return (
-    <motion.span
-      key={status}
-      layout="position"
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE[meta.tone]}`}
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors duration-200',
+        TONE[meta.tone],
+      )}
       data-status={status}
     >
-      <span className="relative flex h-1.5 w-1.5">
-        {(status === 'live' || status === 'analysing') && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60" />
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full bg-current',
+          status === 'analysing' && 'animate-pulse',
         )}
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
-      </span>
+      />
       {meta.label}
-    </motion.span>
+    </span>
   )
 }

@@ -48,3 +48,26 @@ test('camera status and analysis are stored', () => {
   handle({ type: 'analysis', cameraId: '04', frameId: 'x' } as AnalysisMessage)
   expect(useFeedStore.getState().cameras['04'].analysis?.frameId).toBe('x')
 })
+
+test('re-analysis shows as analysing until the next analysis arrives', async () => {
+  const { handle, markReanalysing } = useFeedStore.getState()
+  handle(frame('a', 0), 0)
+  handle({ type: 'analysis', cameraId: '47', frameId: 'a', status: 'ok' } as AnalysisMessage)
+  markReanalysing('47')
+  expect(useFeedStore.getState().cameras['47'].reanalysing).toBe(true)
+  handle({ type: 'analysis', cameraId: '47', frameId: 'a', status: 'ok' } as AnalysisMessage)
+  expect(useFeedStore.getState().cameras['47'].reanalysing).toBe(false)
+})
+
+test('re-analysis flag clears after a timeout when nothing arrives', () => {
+  vi.useFakeTimers()
+  try {
+    const { handle, markReanalysing } = useFeedStore.getState()
+    handle(frame('a', 0), 0)
+    markReanalysing('47')
+    vi.advanceTimersByTime(46_000)
+    expect(useFeedStore.getState().cameras['47'].reanalysing).toBe(false)
+  } finally {
+    vi.useRealTimers()
+  }
+})

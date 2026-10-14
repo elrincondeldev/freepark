@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 
-const apiTarget = process.env.API_URL ?? 'http://localhost:4000'
+// 127.0.0.1, not localhost: on macOS localhost resolves to ::1 first, which may be a different
+// process (e.g. a Docker container publishing :4000) than the dev API.
+const apiTarget = process.env.API_URL ?? 'http://127.0.0.1:4000'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

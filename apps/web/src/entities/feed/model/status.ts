@@ -17,7 +17,7 @@ export function displayStatus(live: CameraFeed | undefined, now: number): Displa
   if (!live.online) return 'offline'
   if (isStale(live, now)) return 'stale'
   const a = live.analysis
-  if (!a || a.frameId !== live.frame.frameId) return 'analysing'
+  if (!a || a.frameId !== live.frame.frameId || live.reanalysing) return 'analysing'
   switch (a.status) {
     case 'ok':
       return a.totalAvailable === null ? 'no_zones' : 'live'

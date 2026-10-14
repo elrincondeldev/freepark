@@ -39,6 +39,11 @@ export const initialDraft: DraftState = {
 }
 
 export const MIN_POINTS = 2
+/** clicks closer than this to the previous point are ignored (double-click to finish) */
+const DUPLICATE_DISTANCE = 0.006
+
+const isNear = (a: Point | undefined, b: Point) =>
+  !!a && Math.hypot(a[0] - b[0], a[1] - b[1]) < DUPLICATE_DISTANCE
 
 export function zoneDraftReducer(state: DraftState, action: DraftAction): DraftState {
   const points = state.draft.points
@@ -63,7 +68,8 @@ export function zoneDraftReducer(state: DraftState, action: DraftAction): DraftS
     case 'cancel':
       return initialDraft
     case 'addPoint':
-      return state.drawing ? { ...state, draft: withPoints([...points, action.point]) } : state
+      if (!state.drawing || isNear(points.at(-1), action.point)) return state
+      return { ...state, draft: withPoints([...points, action.point]) }
     case 'movePoint':
       return {
         ...state,

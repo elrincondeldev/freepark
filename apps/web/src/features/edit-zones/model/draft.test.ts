@@ -46,3 +46,10 @@ test('validation messages', () => {
   expect(validateDraft({ ...zone, name: '  ' })).toMatch(/name/)
   expect(validateDraft(zone)).toBeNull()
 })
+
+test('a double-click does not add a duplicate point', () => {
+  let s = reduce(initialDraft, { type: 'startNew', name: 'Curb 1' })
+  s = reduce(s, { type: 'addPoint', point: [0.1, 0.1] })
+  s = reduce(s, { type: 'addPoint', point: [0.1, 0.101] })
+  expect(s.draft.points).toHaveLength(1)
+})

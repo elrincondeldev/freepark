@@ -1,3 +1,4 @@
+export { reanalyzeCamera } from './api/reanalyze'
 export {
   subscribeMessage,
   type AnalysisMessage,

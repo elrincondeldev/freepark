@@ -57,6 +57,7 @@ half-widths as a fraction of the image **width**, at the first and last zone poi
 | `GET /api/cameras/probe?input=<url or id>` | – | `200 {cameraId, frameId, capturedAt, url}`; `400` bad input; `502` camera unreachable / empty image |
 | `GET /api/cameras/{id}/probe` | – | same as above for a bare id (`4` → `04`) |
 | `GET /api/cameras/{id}/frames/{frameId}.jpg` | – | JPEG, `Cache-Control: immutable`; `404` when pruned |
+| `POST /api/cameras/{id}/reanalyze?fresh=` | – | `202`; re-runs analysis of the latest frame (a new `analysis` message follows). `fresh=true` asks the model again (one prediction); otherwise cached detections are reused. `409` if the camera isn't watched |
 | `GET /api/cameras/{id}/views` | – | `[View]` |
 | `POST /api/cameras/{id}/views` | `{frameId, name}` | `201 View` — saves that frame as the view's reference |
 | `PATCH /api/views/{viewId}` | `{name}` | `View` |

@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useRef, type Dispatch, type PointerEvent } from 'react'
+import { useRef, useState, type Dispatch, type PointerEvent } from 'react'
 import { bandPolygon, midpoints, type Zone } from '@/entities/zone'
 import { clamp01, svgPoints, type Point } from '@/shared/lib'
+import { cn } from '@/shared/ui'
 import type { DraftAction, DraftState } from '../model/draft'
 
 /** Reference image with all zones; the selected zone's points are editable. */
@@ -22,6 +23,7 @@ export function ZoneCanvas({
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const dragIndex = useRef<number | null>(null)
+  const [dragging, setDragging] = useState(false)
   const { draft, drawing, selected, activePoint } = state
   const editing = selected !== null
   const band = bandPolygon(draft.points, draft.bandNear, draft.bandFar)
@@ -34,6 +36,7 @@ export function ZoneCanvas({
   const onHandleDown = (e: PointerEvent<SVGCircleElement>, index: number) => {
     e.stopPropagation()
     dragIndex.current = index
+    setDragging(true)
     dispatch({ type: 'activatePoint', index })
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
   }
@@ -58,12 +61,19 @@ export function ZoneCanvas({
         ref={svgRef}
         viewBox="0 0 1 1"
         preserveAspectRatio="none"
-        className={`absolute inset-0 h-full w-full touch-none ${drawing ? 'cursor-crosshair' : ''}`}
+        className={cn(
+          'absolute inset-0 h-full w-full touch-none',
+          dragging ? 'cursor-grabbing' : drawing ? 'cursor-crosshair' : 'cursor-default',
+        )}
         onClick={(e) =>
           drawing && dispatch({ type: 'addPoint', point: toNorm(e.clientX, e.clientY) })
         }
+        onDoubleClick={() => drawing && dispatch({ type: 'finishLine' })}
         onPointerMove={onPointerMove}
-        onPointerUp={() => (dragIndex.current = null)}
+        onPointerUp={() => {
+          dragIndex.current = null
+          setDragging(false)
+        }}
         data-testid="zone-canvas"
       >
         {zones
@@ -113,7 +123,7 @@ export function ZoneCanvas({
                   cx={m[0]}
                   cy={m[1]}
                   r={0.008}
-                  className="cursor-copy fill-white/70 stroke-accent"
+                  className="cursor-pointer fill-white/70 stroke-accent hover:fill-white"
                   strokeWidth={1}
                   vectorEffect="non-scaling-stroke"
                   onClick={(e) => (
@@ -129,7 +139,11 @@ export function ZoneCanvas({
                 cx={p[0]}
                 cy={p[1]}
                 r={0.013}
-                className={`cursor-grab ${activePoint === i ? 'fill-accent' : 'fill-white'} stroke-accent`}
+                className={cn(
+                  dragging ? 'cursor-grabbing' : 'cursor-grab',
+                  activePoint === i ? 'fill-accent' : 'fill-white',
+                  'stroke-accent',
+                )}
                 strokeWidth={2}
                 vectorEffect="non-scaling-stroke"
                 onPointerDown={(e) => onHandleDown(e, i)}

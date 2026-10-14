@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import type { ReactNode } from 'react'
 import { cn } from './cn'
+import { motionPresets } from './motion'
 
 export interface SwitchProps {
   checked: boolean
@@ -23,7 +24,7 @@ export function Switch({ checked, onChange, label, icon }: SwitchProps) {
       >
         <motion.span
           layout
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          transition={motionPresets.fast}
           className={cn(
             'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow',
             checked ? 'right-0.5' : 'left-0.5',

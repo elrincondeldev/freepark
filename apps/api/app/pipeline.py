@@ -52,6 +52,10 @@ class Analyzer:
         msg.update(extra)
         return msg
 
+    def forget_detections(self, camera_id: str) -> None:
+        """Drop cached detections so the next analysis asks the model again."""
+        self._detections.pop(camera_id, None)
+
     async def _detect(self, frame: FrameInfo) -> list[Detection]:
         cached = self._detections.get(frame.camera_id)
         if cached and cached[0] == frame.frame_id:

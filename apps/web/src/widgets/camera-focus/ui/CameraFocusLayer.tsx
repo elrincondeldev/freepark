@@ -1,13 +1,25 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect } from 'react'
-import { useCameraSelection, useCameraStore, type WatchedCamera } from '@/entities/camera'
+import { useCallback, useRef, useState } from 'react'
+import {
+  useCameraSelection,
+  useCameraStore,
+  type CameraPanel,
+  type WatchedCamera,
+} from '@/entities/camera'
 import { displayStatus, FeedStatusBadge, useDisplayedAnalysis } from '@/entities/feed'
 import { ViewManager } from '@/features/manage-views'
 import { CameraNameInput } from '@/features/rename-camera'
 import { useNow } from '@/shared/lib'
-import { CloseIcon, IconButton } from '@/shared/ui'
+import { ArrowLeftIcon, Button, CloseIcon, fade, IconButton, motionPresets } from '@/shared/ui'
+import { useModalBehaviour } from '../model/useModalBehaviour'
 import { LivePanel } from './LivePanel'
 import { ZoneEditorPanel } from './ZoneEditorPanel'
+
+const PANEL_TITLE: Record<CameraPanel['kind'], string> = {
+  live: '',
+  views: 'Views',
+  zones: 'Zones',
+}
 
 /** Modal focus view for the selected camera (live image, views, zone editor). */
 export function CameraFocusLayer() {
@@ -28,64 +40,116 @@ function CameraFocusDialog({ camera }: { camera: WatchedCamera }) {
   const display = useDisplayedAnalysis(camera.id)
   const { feed, current, displayedId } = display
   const status = displayStatus(feed, now)
+  const dialogRef = useRef<HTMLElement>(null)
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      if (panel.kind === 'live') close()
-      else showPanel({ kind: 'live' })
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [panel, close, showPanel])
+  // Unsaved zone edits: leaving asks first.
+  const [dirty, setDirty] = useState(false)
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null)
+  const leave = useCallback(
+    (action: () => void) => (dirty ? setPendingLeave(() => action) : action()),
+    [dirty],
+  )
+  const back = () =>
+    leave(() => showPanel(panel.kind === 'zones' ? { kind: 'views' } : { kind: 'live' }))
+  const dismiss = () => (panel.kind === 'live' ? close() : back())
 
-  const backToLive = () => showPanel({ kind: 'live' })
+  useModalBehaviour(dialogRef, () => (pendingLeave ? setPendingLeave(null) : dismiss()))
 
   return (
     <motion.div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={close}
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-6"
+      {...fade}
+      onClick={dismiss}
     >
       <motion.section
-        layoutId={`card-${camera.id}`}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={camera.label}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-t-3xl border border-line bg-surface p-4 shadow-2xl sm:rounded-3xl sm:p-6"
-        transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 12 }}
+        transition={motionPresets.base}
+        className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-t-3xl border border-line bg-surface p-4 shadow-2xl outline-none sm:rounded-3xl sm:p-6"
       >
-        <header className="mb-4 flex items-center gap-3">
-          <CameraNameInput camera={camera} />
+        <header className="mb-4 flex min-h-9 items-center gap-2">
+          {panel.kind === 'live' ? (
+            <CameraNameInput camera={camera} />
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={back} className="-ml-2">
+                <ArrowLeftIcon width={16} height={16} />
+                Back
+              </Button>
+              <p className="min-w-0 flex-1 truncate text-sm text-muted">
+                {camera.label} <span aria-hidden>/</span>{' '}
+                <span className="font-medium text-ink">{PANEL_TITLE[panel.kind]}</span>
+              </p>
+            </>
+          )}
           <FeedStatusBadge status={status} />
-          <IconButton label="Close" size="md" onClick={close}>
+          <IconButton label="Close" size="md" onClick={() => leave(close)}>
             <CloseIcon />
           </IconButton>
         </header>
 
-        {panel.kind === 'zones' ? (
-          <ZoneEditorPanel cameraId={camera.id} viewId={panel.viewId} onClose={backToLive} />
-        ) : panel.kind === 'views' ? (
-          <ViewManager
-            cameraId={camera.id}
-            frameId={displayedId ?? feed?.frame?.frameId ?? null}
-            currentViewId={current?.viewId ?? null}
-            unknownView={status === 'unknown_view'}
-            onEditZones={(viewId) => showPanel({ kind: 'zones', viewId })}
-            onClose={backToLive}
-          />
-        ) : (
-          <LivePanel
-            camera={camera}
-            display={display}
-            status={status}
-            now={now}
-            onShowPanel={showPanel}
-          />
-        )}
+        <AnimatePresence>
+          {pendingLeave && (
+            <motion.div
+              {...fade}
+              role="alertdialog"
+              aria-label="Unsaved zone"
+              className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-sm"
+            >
+              <span className="mr-auto">You have an unsaved zone. Leave without saving?</span>
+              <Button variant="secondary" size="xs" onClick={() => setPendingLeave(null)}>
+                Keep editing
+              </Button>
+              <Button
+                variant="danger"
+                size="xs"
+                onClick={() => {
+                  const action = pendingLeave
+                  setPendingLeave(null)
+                  setDirty(false)
+                  action()
+                }}
+              >
+                Discard
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={panel.kind} {...fade}>
+            {panel.kind === 'zones' ? (
+              <ZoneEditorPanel
+                cameraId={camera.id}
+                viewId={panel.viewId}
+                onDirtyChange={setDirty}
+              />
+            ) : panel.kind === 'views' ? (
+              <ViewManager
+                cameraId={camera.id}
+                frameId={displayedId ?? feed?.frame?.frameId ?? null}
+                currentViewId={current?.viewId ?? null}
+                unknownView={status === 'unknown_view'}
+                onEditZones={(viewId) => showPanel({ kind: 'zones', viewId })}
+              />
+            ) : (
+              <LivePanel
+                camera={camera}
+                display={display}
+                status={status}
+                now={now}
+                onShowPanel={showPanel}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </motion.section>
     </motion.div>
   )

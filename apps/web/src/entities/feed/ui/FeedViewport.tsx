@@ -21,7 +21,8 @@ export function FeedViewport({
   children?: ReactNode
 }) {
   const { feed, current, previous, onDisplayed } = display
-  const analysing = !!feed?.frame && feed.analysis?.frameId !== feed.frame.frameId
+  const analysing =
+    !!feed?.frame && (feed.analysis?.frameId !== feed.frame.frameId || !!feed.reanalysing)
   return (
     <>
       <FeedImage frame={feed?.frame} alt={`Camera ${cameraId}`} onDisplayed={onDisplayed} />

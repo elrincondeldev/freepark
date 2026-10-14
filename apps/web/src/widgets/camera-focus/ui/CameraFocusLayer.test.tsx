@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useCameraSelection, useCameraStore } from '@/entities/camera'
 import { useFeedStore } from '@/entities/feed'
@@ -58,4 +58,45 @@ test('rename, notification toggle and close', async () => {
   expect(useCameraStore.getState().cameras[0].notify).toBe(true)
   await user.keyboard('{Escape}')
   expect(useCameraSelection.getState().focusedId).toBeNull()
+})
+
+test('Escape and the backdrop go back one step before closing', async () => {
+  mockApi({ 'GET /api/cameras/47/views': [] })
+  act(() => useCameraSelection.getState().focus('47', { kind: 'views' }))
+  render(<FocusLayer />)
+  expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+  await userEvent.keyboard('{Escape}')
+  expect(useCameraSelection.getState().panel).toEqual({ kind: 'live' })
+  expect(useCameraSelection.getState().focusedId).toBe('47')
+  await userEvent.keyboard('{Escape}')
+  expect(useCameraSelection.getState().focusedId).toBeNull()
+})
+
+test('leaving the zone editor with an unsaved zone asks first', async () => {
+  const view = {
+    id: 3,
+    cameraId: '47',
+    name: 'Avenue',
+    createdAt: '',
+    referenceUrl: null,
+    exemplarCount: 1,
+    zoneCount: 0,
+  }
+  mockApi({ 'GET /api/cameras/47/views': [view], 'GET /api/views/3/zones': [] })
+  act(() => useCameraSelection.getState().focus('47', { kind: 'zones', viewId: 3 }))
+  render(<FocusLayer />)
+  await screen.findByRole('button', { name: 'Save zone' })
+  const svg = screen.getByTestId('zone-canvas')
+  svg.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, width: 400, height: 225, right: 400, bottom: 225, x: 0, y: 0 }) as DOMRect
+  fireEvent.click(svg, { clientX: 100, clientY: 100 })
+
+  await userEvent.keyboard('{Escape}')
+  expect(await screen.findByRole('alertdialog')).toHaveTextContent('unsaved zone')
+  await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }))
+  expect(useCameraSelection.getState().panel).toEqual({ kind: 'zones', viewId: 3 })
+
+  await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Discard' }))
+  expect(useCameraSelection.getState().panel).toEqual({ kind: 'views' })
 })

@@ -1,5 +1,7 @@
 import { AnimatePresence } from 'framer-motion'
+import { useFeedStore } from '@/entities/feed'
 import { viewApi } from '@/entities/view'
+import { toast } from '@/shared/ui'
 import { useViews } from '../model/useViews'
 import { SaveViewForm } from './SaveViewForm'
 import { ViewCard } from './ViewCard'
@@ -11,7 +13,6 @@ export interface ViewManagerProps {
   currentViewId: number | null
   unknownView: boolean
   onEditZones: (viewId: number) => void
-  onClose: () => void
 }
 
 export function ViewManager({
@@ -20,26 +21,29 @@ export function ViewManager({
   currentViewId,
   unknownView,
   onEditZones,
-  onClose,
 }: ViewManagerProps) {
   const { views, error, busy, run } = useViews(cameraId)
+  const markReanalysing = useFeedStore((s) => s.markReanalysing)
+
+  /** Views changed: the API re-analyses the latest image; show progress meanwhile. */
+  const changed = <T,>(result: T | undefined) => {
+    if (result !== undefined) markReanalysing(cameraId)
+    return result
+  }
 
   async function save(name: string) {
     if (!frameId) return
-    const view = await run(() =>
-      viewApi.create(cameraId, frameId, name || `View ${(views?.length ?? 0) + 1}`),
+    const view = changed(
+      await run(() =>
+        viewApi.create(cameraId, frameId, name || `View ${(views?.length ?? 0) + 1}`),
+      ),
     )
     if (view) onEditZones(view.id) // straight into drawing its zones
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Camera views</h3>
-        <button type="button" onClick={onClose} className="text-sm text-muted hover:text-ink">
-          Done
-        </button>
-      </div>
+      <h3 className="font-semibold">Camera views</h3>
       <p className="text-sm text-muted">
         Cameras turn between a few fixed directions. Save each direction you care about once and
         draw its curb zones; we recognise it automatically every time the camera points there again.
@@ -63,8 +67,18 @@ export function ViewManager({
               canRecapture={!!frameId && !busy}
               onRename={(name) => run(() => viewApi.rename(v.id, name))}
               onEditZones={() => onEditZones(v.id)}
-              onRecapture={() => frameId && run(() => viewApi.recaptureReference(v.id, frameId))}
-              onDelete={() => run(() => viewApi.remove(v.id))}
+              onRecapture={async () => {
+                if (!frameId) return
+                const result = changed(await run(() => viewApi.recaptureReference(v.id, frameId)))
+                if (result)
+                  toast({
+                    title: `“${v.name}” reference updated`,
+                    body: result.zonesRealigned
+                      ? 'Its zones were moved to match the new image.'
+                      : 'Check its zones: the new image looks different.',
+                  })
+              }}
+              onDelete={async () => changed(await run(() => viewApi.remove(v.id)))}
             />
           ))}
         </AnimatePresence>

@@ -1,35 +1,24 @@
-import { render } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 import { analysisMsg } from '@/test/factories'
-import { ParkingOverlay as Overlay } from './ParkingOverlay'
+import { ParkingOverlay } from './ParkingOverlay'
 
-function mockReducedMotion(reduce: boolean) {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn().mockImplementation((query: string) => ({
-      matches: reduce && query.includes('prefers-reduced-motion'),
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      onchange: null,
-      dispatchEvent: () => false,
-    })),
-  )
-}
-
-afterEach(() => vi.unstubAllGlobals())
-
-test('animates rectangles in with a scale transform by default', () => {
-  mockReducedMotion(false)
-  render(<Overlay analysis={analysisMsg('f1')} />)
-  const rect = document.querySelector('[data-kind="occupied"]') as SVGElement
-  expect(rect.style.transform).toMatch(/scale/)
+test('draws red occupied boxes, green available areas and dashed other vehicles', () => {
+  render(<ParkingOverlay analysis={analysisMsg('f1')} />)
+  expect(document.querySelectorAll('[data-kind="occupied"]')).toHaveLength(2)
+  expect(document.querySelectorAll('[data-kind="available"]')).toHaveLength(1)
+  expect(document.querySelectorAll('[data-kind="other"]')).toHaveLength(1)
 })
 
-test('hides other vehicles on request and renders nothing without analysis', () => {
-  const { rerender } = render(<Overlay analysis={analysisMsg('f1')} showOthers={false} />)
+test('shapes are static: no per-shape transform animation', () => {
+  render(<ParkingOverlay analysis={analysisMsg('f1')} />)
+  for (const el of document.querySelectorAll('[data-kind]')) {
+    expect((el as SVGElement).style.transform).toBe('')
+  }
+})
+
+test('hides other vehicles on request and fades out without analysis', async () => {
+  const { rerender } = render(<ParkingOverlay analysis={analysisMsg('f1')} showOthers={false} />)
   expect(document.querySelectorAll('[data-kind="other"]')).toHaveLength(0)
-  rerender(<Overlay analysis={undefined} />)
-  expect(document.querySelector('[data-testid="overlay"]')).toBeNull()
+  rerender(<ParkingOverlay analysis={undefined} />)
+  await waitFor(() => expect(document.querySelector('[data-testid="overlay"]')).toBeNull())
 })

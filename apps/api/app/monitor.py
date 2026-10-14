@@ -160,11 +160,17 @@ class CameraMonitor:
         self._pending = frame  # latest wins: overwrite any frame not yet analysed
         self._wakeup.set()
 
-    def requeue_latest(self) -> None:
-        """Re-analyse the latest frame (e.g. after its views or zones changed)."""
-        if self._last_frame is not None and self._pending is None:
+    def requeue_latest(self) -> bool:
+        """Re-analyse the latest frame (e.g. after its views or zones changed).
+
+        Returns False when there is no frame yet. A frame already waiting is analysed anyway.
+        """
+        if self._last_frame is None:
+            return False
+        if self._pending is None:
             self._pending = self._last_frame
             self._wakeup.set()
+        return True
 
     async def _poll_loop(self) -> None:
         while True:
@@ -267,10 +273,10 @@ class WatchManager:
             except Exception:  # a dead socket is cleaned up by its own handler
                 log.debug("send to subscriber failed", exc_info=True)
 
-    def requeue(self, camera_id: str) -> None:
+    def requeue(self, camera_id: str) -> bool:
+        """Re-analyse a watched camera's latest frame; False if it is not being monitored."""
         monitor = self.monitors.get(camera_id)
-        if monitor is not None:
-            monitor.requeue_latest()
+        return monitor is not None and monitor.requeue_latest()
 
     async def shutdown(self) -> None:
         for monitor in list(self.monitors.values()):

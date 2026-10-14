@@ -55,6 +55,22 @@ async def probe_camera(camera_id: str, svc: Svc):
     return await _probe(svc, _camera_id(camera_id))
 
 
+@router.post("/{camera_id}/reanalyze", status_code=202)
+def reanalyze(camera_id: str, svc: Svc, fresh: bool = False):
+    """Re-run analysis of the latest frame of a watched camera.
+
+    `fresh=true` asks the model again (one prediction); otherwise cached detections are
+    reused and only views/zones are re-evaluated.
+    """
+    cam = _camera_id(camera_id)
+    if fresh:
+        svc.analyzer.forget_detections(cam)
+    svc.views.invalidate(cam)
+    if not svc.manager.requeue(cam):
+        raise HTTPException(409, "camera is not being watched or has no image yet")
+    return {"cameraId": cam, "queued": True, "fresh": fresh}
+
+
 @router.get("/{camera_id}/frames/{frame_id}.jpg")
 def get_frame(camera_id: str, frame_id: str, svc: Svc):
     path = svc.store.path(_camera_id(camera_id), frame_id)

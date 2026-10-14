@@ -29,7 +29,6 @@ function renderManager(props: Partial<Parameters<typeof ViewManager>[0]> = {}) {
       currentViewId={1}
       unknownView={false}
       onEditZones={onEditZones}
-      onClose={() => {}}
       {...props}
     />,
   )
