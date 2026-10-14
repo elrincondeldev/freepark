@@ -13,7 +13,7 @@ AI model on [Replicate](https://replicate.com), and marks curb space as **occupi
   only when the source publishes a new image.
 
 ```
-apps/web   React + TypeScript + Tailwind + Framer Motion + Zustand (Vite)
+apps/web   React + TypeScript + Tailwind + Framer Motion + Zustand (Vite), Feature-Sliced Design → see apps/web/README.md
 apps/api   Python + FastAPI + OpenCV, SQLite, Replicate   → see apps/api/README.md
 ```
 

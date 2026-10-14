@@ -108,16 +108,16 @@ Each zone's arc is discretised into 200 bins. A bin is published as available on
 
 REST surface (all JSON unless noted): `GET /api/health`; `GET /api/cameras/probe?input=<url or id>` and `GET /api/cameras/{id}/probe`; `GET /api/cameras/{id}/frames/{frameId}.jpg`; `GET|POST /api/cameras/{id}/views`; `PATCH|DELETE /api/views/{viewId}`; `POST /api/views/{viewId}/reference` (re-capture from a `frameId`); `GET /api/views/{viewId}/reference.jpg`; `GET|POST /api/views/{viewId}/zones`; `PATCH|DELETE /api/zones/{zoneId}`. Camera ids validated as `^\d{1,3}$` and normalised by zero-padding to two digits; zone payloads capped (≤ 64 points, coordinates in `[0,1]`).
 
-### D10. Frontend state and rendering
-Zustand stores:
-- `useCameraStore` (persisted via `persist` middleware, key `parking-vision:v1`, `version` + `migrate`, a `createJSONStorage` wrapper that catches storage errors and flags `storageAvailable=false`): ordered `cameras[{id, label, notify}]`, `settings{sound}`.
-- `useLiveStore` (memory only): per camera `{frame, analysis, displayedFrameId, status, lastFrameAt}`.
-- A `wsClient` module owns the socket, reconnects with jittered backoff, re-sends `subscribe` whenever `cameras` changes (store subscription).
+### D10. Frontend structure and state
+The web app follows Feature-Sliced Design (`app → pages → widgets → features → entities → shared`), enforced by `src/test/architecture.test.ts`; see `apps/web/README.md`. Zustand stores live in entities:
+- `entities/camera` — `useCameraStore` (persisted via `persist`, key `parking-vision:v1`, `version` + `migrate`, a storage wrapper that catches storage errors and flags `storageAvailable=false`): ordered `cameras[{id, label, notify}]`, `settings{sound}`; and `useCameraSelection` (focused camera, open panel: live / views / zones).
+- `entities/feed` — `useFeedStore` (memory only): per camera `{frame, analysis, online, lastFrameAt, gaps}`.
+- `features/live-updates` owns the `WsClient` (generic, in `shared/lib`): one socket, jittered reconnect, re-sends `subscribe` whenever the camera list changes.
 
-Rendering: the card preloads the next frame (`new Image()` + `decode()`), then crossfades (`AnimatePresence`, keyed by `frameId`). Overlays render only when `analysis.frameId === displayedFrameId`; otherwise the previous overlay fades to 30 % with an "analysing" shimmer. Framer Motion: `layout` on the card grid, `layoutId` shared-element transition into the focus view, spring-animated counters, staggered rectangle entrance; `useReducedMotion` disables movement. Tailwind with CSS-variable tokens for light/dark. Zone editor: SVG over the view reference image, click-to-add points, draggable handles, band-width sliders with live band preview.
+Rendering: `FeedViewport` preloads the next frame (`new Image()` + `decode()`), then crossfades (`AnimatePresence`, keyed by `frameId`). Overlays render only for the analysis of the displayed frame (`useDisplayedAnalysis`); otherwise the previous overlay fades to 30 % with an "analysing" shimmer. Framer Motion: `layout` on the card grid, `layoutId` shared-element transition into the focus view, spring-animated counters, staggered rectangle entrance; `MotionConfig reducedMotion="user"` disables movement. Tailwind with CSS-variable tokens for light/dark. Zone editor: SVG over the view reference image, click-to-add points, draggable handles, band-width sliders with live band preview; draft state in a pure reducer.
 
 ### D11. Notifications computed client-side
-Availability transitions are detected in `useLiveStore` when an `analysis` with `status = ok` arrives: alert if `totalAvailable` goes `0 → ≥1` or a zone gains its first available gap, subject to a per-camera cooldown (`2 min`, bypassed when the count increases further). Delivery: animated toast (always) + `new Notification(...)` when `document.visibilityState === 'hidden'` and permission is granted; permission requested from the notification toggle's click handler. Client-side because preferences live in `localStorage` and no background delivery is in scope.
+Availability transitions are detected by `features/availability-alerts`, which subscribes to the feed store and checks each new `analysis` with `status = ok`: alert if `totalAvailable` goes `0 → ≥1` or a zone gains its first available gap, subject to a per-camera cooldown (`2 min`, bypassed when the count increases further). Delivery: animated toast (always) + `new Notification(...)` when `document.visibilityState === 'hidden'` and permission is granted; permission requested from the notification toggle's click handler. Client-side because preferences live in `localStorage` and no background delivery is in scope.
 
 ## Risks / Trade-offs
 

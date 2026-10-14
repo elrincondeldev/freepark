@@ -1,4 +1,4 @@
-import type { AnalysisMessage, FrameMessage } from '../lib/types'
+import type { AnalysisMessage, FrameMessage } from '@/entities/feed'
 
 export const frameMsg = (frameId: string, cameraId = '47'): FrameMessage => ({
   type: 'frame',
