@@ -1,0 +1,39 @@
+# docker compose up --build  →  http://localhost:${WEB_PORT:-8080}
+# Settings come from .env (optional; see .env.example) via variable interpolation.
+services:
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
+      FRAME_RETENTION: ${FRAME_RETENTION:-20}
+      DETECTOR: ${DETECTOR:-replicate}
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      REPLICATE_MODEL: ${REPLICATE_MODEL:-adirik/grounding-dino:efd10a8ddc57ea28773327e881ce95e20cc1d734c589f7dd01d2036921ed78aa}
+      REPLICATE_INPUT_TEMPLATE: ${REPLICATE_INPUT_TEMPLATE:-}
+      REPLICATE_OUTPUT_FORMAT: ${REPLICATE_OUTPUT_FORMAT:-grounding_dino}
+      DETECTION_UPSCALE: ${DETECTION_UPSCALE:-3}
+      DETECTION_MIN_CONFIDENCE: ${DETECTION_MIN_CONFIDENCE:-0.15}
+      DETECTION_MAX_BOX_AREA: ${DETECTION_MAX_BOX_AREA:-0.2}
+      MAX_CONCURRENT_PREDICTIONS: ${MAX_CONCURRENT_PREDICTIONS:-4}
+      VIEW_MASK: ${VIEW_MASK:-0,0,1,0.09}
+      AVAILABLE_CONFIRM_FRAMES: ${AVAILABLE_CONFIRM_FRAMES:-2}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    volumes:
+      - api-data:/data
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+volumes:
+  api-data:

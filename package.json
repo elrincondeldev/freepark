@@ -1,0 +1,14 @@
+{
+  "name": "parking-vision",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "dev:api": "cd apps/api && uv run uvicorn app.main:app --reload --port ${API_PORT:-4000}",
+    "build": "npm run build -w apps/web",
+    "test": "npm run test -w apps/web && cd apps/api && uv run pytest -q",
+    "lint": "npm run lint -w apps/web && cd apps/api && uv run ruff check ."
+  }
+}
