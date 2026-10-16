@@ -15,6 +15,7 @@ import numpy as np
 class Projection:
     s: float  # arc length of the closest point
     distance: float  # distance from the point to the line
+    signed: float = 0.0  # distance with side: > 0 left of the drawing direction, < 0 right
 
 
 class Polyline:
@@ -42,9 +43,11 @@ class Polyline:
                 continue
             d = (self.points[i + 1] - a) / length
             t = float(np.clip(np.dot(p - a, d), 0.0, length))
-            dist = float(np.hypot(*(p - (a + d * t))))
+            off = p - (a + d * t)
+            dist = float(np.hypot(*off))
             if dist < best.distance:
-                best = Projection(float(self.cum[i] + t), dist)
+                side = 1.0 if d[0] * off[1] - d[1] * off[0] >= 0 else -1.0
+                best = Projection(float(self.cum[i] + t), dist, side * dist)
         return best
 
     def _segment(self, s: float) -> int:

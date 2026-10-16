@@ -132,8 +132,9 @@ def test_gap_of_one_and_a_bit_cars_is_one_space():
 
 
 def test_gap_smaller_than_a_car_is_not_available():
+    # neighbouring cars are 38.4 px apart, so one space is 38.4 px of curb
     cars = [car(0.15), car(0.25)]
-    gap_px = 0.9 * 50.7
+    gap_px = 0.9 * 38.4
     x = 0.3 + gap_px / 384
     while x + 0.1 <= 0.9:
         cars.append(car(x + 0.05))
@@ -159,11 +160,28 @@ def test_learned_car_length_used_after_samples():
     assert persp.car_length(0) > persp.car_length(307)
 
 
-def test_length_samples_reported():
-    results, _ = evaluate([car(0.5)])
+def test_space_length_learned_from_neighbour_spacing():
+    results, _ = evaluate([car(0.45), car(0.55), car(0.8)])  # first two touch, third is apart
     (sample,) = results[0].length_samples
     assert sample[0] == pytest.approx(0.5, abs=0.01)
     assert sample[1] == pytest.approx(38.4 / 307.2, abs=0.01)
+
+
+def test_lone_car_records_no_spacing():
+    results, _ = evaluate([car(0.5)])
+    assert results[0].length_samples == []
+
+
+def test_angled_parking_counts_bays_by_spacing_not_box_size():
+    """Angled ("en batería") parking: boxes are wide and overlap, but each car only takes
+    ~19 px of curb. A 4-bay hole between two groups must show free bays."""
+    pitch = 19.2 / 384  # spacing between neighbouring angled cars
+    width = 0.1  # each box is twice as wide as the curb the car takes
+    left = [car(0.15 + i * pitch, width=width) for i in range(4)]
+    hole_start = 0.15 + 4 * pitch
+    right = [car(hole_start + 4 * pitch + i * pitch, width=width) for i in range(4)]
+    results, _ = evaluate(left + right)
+    assert results[0].spaces >= 2
 
 
 # --- smoothing ------------------------------------------------------------------

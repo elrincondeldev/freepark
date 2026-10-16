@@ -4,11 +4,12 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 
 from app.camera_ids import InvalidCameraId, normalize_camera_id, parse_camera_input
 from app.frames import make_frame_id
+from app.monitor import CameraState, FrameInfo, frame_message
 from app.services import Services, get_services
 from app.source import FetchError
 
@@ -55,20 +56,54 @@ async def probe_camera(camera_id: str, svc: Svc):
     return await _probe(svc, _camera_id(camera_id))
 
 
-@router.post("/{camera_id}/reanalyze", status_code=202)
-def reanalyze(camera_id: str, svc: Svc, fresh: bool = False):
-    """Re-run analysis of the latest frame of a watched camera.
+async def _latest_frame(svc: Services, camera_id: str) -> FrameInfo:
+    """The newest stored image of a camera, or a freshly fetched one if none is stored."""
+    frames = svc.store.list_frames(camera_id)
+    path = svc.store.path(camera_id, frames[-1]) if frames else None
+    if path is not None:
+        frame_id = frames[-1]
+        epoch = int(frame_id.split("-")[0])
+        data = await asyncio.to_thread(path.read_bytes)
+    else:
+        try:
+            fetched = await svc.fetcher.fetch(camera_id)
+        except FetchError as exc:
+            raise HTTPException(502, f"camera {camera_id} could not be reached: {exc}") from exc
+        epoch, data = fetched.captured_epoch, fetched.data
+        frame_id = make_frame_id(epoch, data)
+        await asyncio.to_thread(svc.store.save, camera_id, frame_id, data)
+    captured = datetime.fromtimestamp(epoch, UTC).isoformat()
+    return FrameInfo(camera_id, frame_id, captured, data)
+
+
+@router.post("/{camera_id}/reanalyze")
+async def reanalyze(camera_id: str, svc: Svc, response: Response, fresh: bool = False):
+    """Re-run analysis of a camera's latest image.
 
     `fresh=true` asks the model again (one prediction); otherwise cached detections are
-    reused and only views/zones are re-evaluated.
+    reused and only views/zones are re-evaluated. A watched camera is re-queued on its
+    monitor (202; the result arrives over the WebSocket). Any other camera is analysed
+    right away from its latest stored image, or a freshly fetched one (200, result in the
+    body and broadcast to subscribers).
     """
     cam = _camera_id(camera_id)
     if fresh:
         svc.analyzer.forget_detections(cam)
     svc.views.invalidate(cam)
-    if not svc.manager.requeue(cam):
-        raise HTTPException(409, "camera is not being watched or has no image yet")
-    return {"cameraId": cam, "queued": True, "fresh": fresh}
+    if svc.manager.requeue(cam):
+        response.status_code = 202
+        return {"cameraId": cam, "queued": True, "fresh": fresh}
+
+    frame = await _latest_frame(svc, cam)
+    try:
+        analysis = await svc.analyzer(frame)
+    except Exception as exc:
+        raise HTTPException(500, f"analysis failed: {exc}") from exc
+    state = svc.manager.states.setdefault(cam, CameraState())
+    state.frame_msg, state.analysis_msg = frame_message(frame), analysis
+    await svc.manager.broadcast(cam, state.frame_msg)
+    await svc.manager.broadcast(cam, analysis)
+    return {"cameraId": cam, "queued": False, "fresh": fresh, "analysis": analysis}
 
 
 @router.get("/{camera_id}/frames/{frame_id}.jpg")

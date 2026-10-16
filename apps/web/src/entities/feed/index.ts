@@ -1,4 +1,4 @@
-export { reanalyzeCamera } from './api/reanalyze'
+export { reanalyzeCamera, type ReanalyzeResult } from './api/reanalyze'
 export {
   subscribeMessage,
   type AnalysisMessage,

@@ -47,7 +47,8 @@ The model choice is documented in [docs/model-benchmark.md](docs/model-benchmark
 
 All geometry is normalised to the frame: `x` and `y` in `[0, 1]`, origin top-left. Boxes are
 `[x1, y1, x2, y2]`; polygons are `[[x, y], …]`. Zone band widths (`bandNear`, `bandFar`) are
-half-widths as a fraction of the image **width**, at the first and last zone point.
+half-widths as a fraction of the image **width**, at the end of the line nearer the camera
+(lower in the image) and the end further away, whichever direction it was drawn in.
 
 ## REST
 
@@ -57,7 +58,7 @@ half-widths as a fraction of the image **width**, at the first and last zone poi
 | `GET /api/cameras/probe?input=<url or id>` | – | `200 {cameraId, frameId, capturedAt, url}`; `400` bad input; `502` camera unreachable / empty image |
 | `GET /api/cameras/{id}/probe` | – | same as above for a bare id (`4` → `04`) |
 | `GET /api/cameras/{id}/frames/{frameId}.jpg` | – | JPEG, `Cache-Control: immutable`; `404` when pruned |
-| `POST /api/cameras/{id}/reanalyze?fresh=` | – | `202`; re-runs analysis of the latest frame (a new `analysis` message follows). `fresh=true` asks the model again (one prediction); otherwise cached detections are reused. `409` if the camera isn't watched |
+| `POST /api/cameras/{id}/reanalyze?fresh=` | – | Re-runs analysis of the camera's latest image; works for any camera. Watched camera: `202 {queued: true}`, result follows over the WebSocket. Otherwise analysed right away from the latest stored (or freshly fetched) image: `200 {queued: false, analysis}`, also broadcast. `fresh=true` asks the model again (one prediction). `502` if no image can be obtained |
 | `GET /api/cameras/{id}/views` | – | `[View]` |
 | `POST /api/cameras/{id}/views` | `{frameId, name}` | `201 View` — saves that frame as the view's reference |
 | `PATCH /api/views/{viewId}` | `{name}` | `View` |

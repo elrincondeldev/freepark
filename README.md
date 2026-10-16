@@ -55,9 +55,10 @@ npm run lint        # ESLint + Prettier + Ruff
    type its number (`47`, `04`). A preview confirms the camera is reachable.
 2. **Save the view.** A new camera shows **Unknown view**. Click **Save view**, name it
    (e.g. "Towards the port") and you land in the zone editor.
-3. **Draw curb zones.** Click along the curb where cars park, then **Finish line**. Adjust
-   the band width at the near and far end so parked cars fall inside it. Cars that sit
-   partly inside or outside the band still count. Save.
+3. **Draw curb zones.** Click along the kerb where cars park; double-click or press Enter
+   to finish. A car counts as parked when it touches the band or sits right beside it, so
+   adjust the band width (near and far from the camera) until it touches the parked cars.
+   Save.
 4. **Watch.** Red boxes are cars occupying a zone; green areas are gaps long enough for
    at least one car. A gap is shown as free only after it has been free in two consecutive
    images, so one missed detection doesn't create a false space.

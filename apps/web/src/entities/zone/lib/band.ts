@@ -8,11 +8,22 @@ const toPx = ([x, y]: Point): Point => [x * FRAME_W, y * FRAME_H]
 const toNorm = ([x, y]: Point): Point => [x / FRAME_W, y / FRAME_H]
 
 /**
+ * Band half-widths at the first / last point. `bandNear` belongs to the end closer to the
+ * camera (lower in the image), whichever direction the line was drawn in (mirrors
+ * `near_far_bands` in the API).
+ */
+export function endBands(points: Point[], bandNear: number, bandFar: number): [number, number] {
+  if (points.length < 2) return [bandNear, bandFar]
+  return points[0][1] >= points[points.length - 1][1] ? [bandNear, bandFar] : [bandFar, bandNear]
+}
+
+/**
  * Outline of a zone's tolerance band (mirrors Polyline.band_polygon in the API).
- * Band half-widths are fractions of the image width at the first / last point.
+ * Band half-widths are fractions of the image width, near the camera and far from it.
  */
 export function bandPolygon(points: Point[], bandNear: number, bandFar: number): Point[] {
   if (points.length < 2) return []
+  const [bandFirst, bandLast] = endBands(points, bandNear, bandFar)
   const px = points.map(toPx)
   const cum = [0]
   for (let i = 1; i < px.length; i++) {
@@ -29,7 +40,7 @@ export function bandPolygon(points: Point[], bandNear: number, bandFar: number):
     const len = Math.hypot(dx, dy) || 1
     const nx = -dy / len
     const ny = dx / len
-    const w = (bandNear + (bandFar - bandNear) * (cum[i] / total)) * FRAME_W
+    const w = (bandFirst + (bandLast - bandFirst) * (cum[i] / total)) * FRAME_W
     left.push(toNorm([p[0] + nx * w, p[1] + ny * w]))
     right.push(toNorm([p[0] - nx * w, p[1] - ny * w]))
   })

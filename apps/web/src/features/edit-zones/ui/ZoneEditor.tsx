@@ -105,8 +105,9 @@ export function ZoneEditor({
           onSelectZone={(zone) => state.selected === null && select(zone)}
         />
         <p className="mt-2 text-xs text-muted">
-          Zones are approximate: cars partly inside or outside the band still count. Draw them on
-          the nearer part of the curb, where the AI sees cars best.
+          A car counts as parked when it touches the band or sits right beside it, so drawing the
+          line along the kerb works. Prefer the nearer part of the street, where the AI sees cars
+          best.
         </p>
       </div>
 
@@ -149,12 +150,12 @@ function EditorHint({ drawing, points }: { drawing: boolean; points: number }) {
           <li className={points >= 2 ? 'text-ink' : ''}>
             2. Double-click or press <kbd className="font-sans font-semibold">Enter</kbd> to finish
           </li>
-          <li>3. Widen the band until parked cars fit inside, then save</li>
+          <li>3. Adjust the band so it touches the parked cars, then save</li>
         </>
       ) : (
         <>
           <li>Drag points to move them · click a + to add one</li>
-          <li>Widen the band until parked cars fit inside</li>
+          <li>Adjust the band so it touches the parked cars</li>
           <li>
             <kbd className="font-sans font-semibold">Backspace</kbd> removes the selected point
           </li>

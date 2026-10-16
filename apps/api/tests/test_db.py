@@ -4,11 +4,11 @@ from app.db import MAX_LENGTH_SAMPLES, Repository
 def test_migrations_idempotent(tmp_path):
     path = tmp_path / "p.db"
     repo = Repository(path)
-    assert repo.schema_version() == 1
+    assert repo.schema_version() == 2
     repo.close()
     repo = Repository(path)  # re-open runs migrate() again
-    assert repo.migrate() == 1
-    assert repo.schema_version() == 1
+    assert repo.migrate() == 2
+    assert repo.schema_version() == 2
 
 
 def test_view_crud(tmp_path):

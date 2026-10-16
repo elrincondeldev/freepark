@@ -36,18 +36,30 @@ When a prediction fails, times out or the API token is missing, the backend SHAL
 - **THEN** the frame is reported as "analysis unavailable" and the backend respects the retry delay before the next prediction
 
 ### Requirement: Assign vehicles to zones
-For a frame matched to a view, the backend SHALL assign a detected vehicle to a zone when the vehicle's ground-contact point lies within that zone's tolerance band, and SHALL project it onto the zone line as an occupied interval.
+For a frame matched to a view, the backend SHALL assign a detected vehicle to a zone when the vehicle's ground footprint (the bottom part of its box) overlaps that zone's tolerance band or lies right beside it (within a fraction of the vehicle's own width), and SHALL project it onto the zone line as an occupied interval. Duplicate boxes for the same vehicle and boxes enclosing a whole row of vehicles SHALL be discarded first.
 
 #### Scenario: Partially overlapping car
 - **WHEN** a car's bounding box straddles the drawn curb line
 - **THEN** the car is assigned to that zone and its interval along the line is marked occupied
+
+#### Scenario: Car parked beside a line drawn along the kerb
+- **WHEN** the zone line follows the kerb and a parked car's footprint sits next to the band on the road side
+- **THEN** the car is assigned to that zone
+
+#### Scenario: Car in the adjacent lane
+- **WHEN** a vehicle's footprint is about a car-width or more away from the band (e.g. driving in the next lane)
+- **THEN** it is not assigned to the zone
+
+#### Scenario: Duplicate detections
+- **WHEN** the model returns two heavily overlapping boxes for one car, or one box around a row of cars
+- **THEN** only one box per car is used for occupancy
 
 #### Scenario: Moving traffic ignored
 - **WHEN** a vehicle is detected in the middle of the carriageway far from any zone band
 - **THEN** it is shown as a detection but not counted as occupying any zone
 
 ### Requirement: Compute available gaps
-For each zone the backend SHALL compute the free stretches between occupied intervals (and between intervals and zone ends) and SHALL report a stretch as an available space only when its length is at least the zone's minimum gap length, estimated in a perspective-aware way from the size of vehicles detected near that point (or the zone override). Each available stretch SHALL report how many cars fit in it.
+For each zone the backend SHALL compute the free stretches between occupied intervals (and between intervals and zone ends) and SHALL report a stretch as available only when it is at least the zone's minimum gap length (one space length times a margin, or the zone override). Each available stretch SHALL report how many cars fit in it.
 
 #### Scenario: Gap large enough
 - **WHEN** a zone has a free stretch roughly 1.3 car-lengths long at that position
@@ -60,6 +72,17 @@ For each zone the backend SHALL compute the free stretches between occupied inte
 #### Scenario: Empty zone
 - **WHEN** a zone contains no vehicles
 - **THEN** the whole zone is reported available with an estimated count of spaces
+
+### Requirement: Estimate space length
+The backend SHALL estimate, per zone and in a perspective-aware way, how much curb one parked car takes, from the spacing between neighbouring parked vehicles; without neighbours it SHALL fall back to the size of the vehicles seen, then to the zone's band width. A vehicle's occupied stretch SHALL not exceed about one space around its centre.
+
+#### Scenario: Parallel parking
+- **WHEN** cars are parked one behind the other along the curb
+- **THEN** one space is about one car length
+
+#### Scenario: Angled parking
+- **WHEN** cars park at an angle ("en batería"), their boxes overlap and are larger than the curb each takes, and an empty stretch between two groups is three bays wide
+- **THEN** the stretch is reported available with about three spaces, sized by the spacing between neighbouring cars rather than by their boxes
 
 ### Requirement: Occupancy result
 Each analysed frame SHALL produce a result containing camera identifier, frame identifier and timestamp, view status (matched view, unknown, low quality, analysis unavailable), detected vehicles, per-zone occupied segments, per-zone available segments with estimated space counts, and the camera-wide total of available spaces.

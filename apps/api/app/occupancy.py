@@ -37,21 +37,28 @@ class ZoneShape:
 
     zone: Zone
     line: Polyline
-    lengths: list[tuple[float, float]]  # learned (s fraction, car length fraction of S)
+    # (s fraction, space length as a fraction of S): spacing between neighbouring parked cars
+    lengths: list[tuple[float, float]]
+    # used when no spacing is known: median extent of the cars seen in this frame (px)
+    default_length: float | None = None
 
     def car_length(self, s: float) -> float:
-        """Perspective-aware car length in px at arc position s."""
-        fallback = CAR_LENGTH_PER_BAND * 2 * self.line.band(s)
-        if len(self.lengths) >= MIN_SAMPLES_FOR_FIT and self.line.length > 0:
+        """Perspective-aware length of curb one parked car takes (px) at arc position s.
+
+        Learned from the spacing between neighbouring parked cars, so it is a car length
+        for parallel parking and roughly a car width for angled ("en batería") parking.
+        """
+        band_based = CAR_LENGTH_PER_BAND * 2 * self.line.band(s)
+        if self.lengths and self.line.length > 0:
             xs = np.array([p for p, _ in self.lengths])
             ys = np.array([v for _, v in self.lengths]) * self.line.length
-            if xs.max() - xs.min() > 0.1:
+            if len(self.lengths) >= MIN_SAMPLES_FOR_FIT and xs.max() - xs.min() > 0.1:
                 slope, intercept = np.polyfit(xs, ys, 1)
+                fitted = intercept + slope * (s / self.line.length)
             else:
-                slope, intercept = 0.0, float(ys.mean())
-            fitted = intercept + slope * (s / self.line.length)
-            return float(np.clip(fitted, 0.5 * fallback, 3 * fallback))
-        return fallback
+                fitted = float(np.median(ys))
+            return float(np.clip(fitted, 0.15 * band_based, 3 * band_based))
+        return self.default_length or band_based
 
     def cars_between(self, a: float, b: float, steps: int = 24) -> float:
         """∫ ds / L(s): how many car lengths fit between arc positions a and b."""
@@ -62,11 +69,19 @@ class ZoneShape:
         return float(np.trapezoid(inv, xs))
 
 
+def near_far_bands(zone: Zone) -> tuple[float, float]:
+    """Band widths at the first / last point. `band_near` belongs to the end closer to the
+    camera (lower in the image), whichever direction the zone was drawn in."""
+    first_y, last_y = zone.points[0][1], zone.points[-1][1]
+    if first_y >= last_y:
+        return zone.band_near, zone.band_far
+    return zone.band_far, zone.band_near
+
+
 def map_zone(zone: Zone, homography: np.ndarray, geom: FrameGeometry, lengths) -> ZoneShape:
     pts = apply_homography(homography, np.array(zone.points))
-    line = Polyline(
-        geom.to_px(pts), band_near=zone.band_near * geom.width, band_far=zone.band_far * geom.width
-    )
+    first, last = near_far_bands(zone)
+    line = Polyline(geom.to_px(pts), band_near=first * geom.width, band_far=last * geom.width)
     return ZoneShape(zone, line, list(lengths))
 
 
@@ -90,23 +105,93 @@ class Assignment:
     interval: tuple[float, float] | None = None
 
 
+FOOTPRINT_HEIGHT = 0.4  # bottom share of a box treated as the vehicle's ground footprint
+# A vehicle is parked in a zone when its footprint is within this many footprint widths of
+# the band. Parked cars touch or sit right next to the curb line; a car in the adjacent lane
+# is about one car width further out.
+MAX_GAP_WIDTHS = 0.25
+
+
+def footprint_points(box_px: np.ndarray) -> list[np.ndarray]:
+    """Points spanning the bottom part of a box: where the vehicle meets the road."""
+    x1, y1, x2, y2 = box_px
+    top = y2 - FOOTPRINT_HEIGHT * (y2 - y1)
+    xm = (x1 + x2) / 2
+    return [np.array(p) for p in ((x1, y2), (xm, y2), (x2, y2), (x1, top), (xm, top), (x2, top))]
+
+
+def footprint_gap(line: Polyline, box_px: np.ndarray) -> tuple[float, float] | None:
+    """How far a vehicle's footprint is from the zone band, in footprint widths.
+
+    Returns (gap, centre offset in band units): gap is 0 when the footprint overlaps the
+    band. None when the vehicle lies beyond the ends of the zone.
+    """
+    projections = [line.project(p) for p in footprint_points(box_px)]
+    ss = [p.s for p in projections]
+    if max(ss) - min(ss) <= 1e-6 and (min(ss) <= 0 or max(ss) >= line.length):
+        return None  # entirely beyond one end of the line
+    centre = line.project(ground_point(box_px))
+    band = line.band(centre.s)
+    if band <= 0:
+        return None
+    lo = min(p.signed for p in projections)
+    hi = max(p.signed for p in projections)
+    width = max(hi - lo, 1.0)
+    gap = max(0.0, lo - band, -band - hi)
+    return gap / width, abs(centre.signed) / band
+
+
 def assign(shapes: list[ZoneShape], boxes_px: list[np.ndarray]) -> list[Assignment]:
+    """Assign each vehicle to the zone whose band its footprint touches or sits next to."""
     out: list[Assignment] = []
     for box in boxes_px:
-        gp = ground_point(box)
-        best: tuple[float, int, float] | None = None
+        best: tuple[float, float, int] | None = None
         for i, shape in enumerate(shapes):
-            proj = shape.line.project(gp)
-            band = shape.line.band(proj.s)
-            if band > 0 and proj.distance <= band:
-                score = proj.distance / band
-                if best is None or score < best[0]:
-                    best = (score, i, proj.s)
+            fit = footprint_gap(shape.line, box)
+            if fit is None or fit[0] > MAX_GAP_WIDTHS:
+                continue
+            if best is None or fit < best[:2]:  # nearest band first, then nearest line
+                best = (*fit, i)
         if best is None:
             out.append(Assignment(None))
         else:
-            out.append(Assignment(best[1], occupied_interval(shapes[best[1]].line, box)))
+            out.append(Assignment(best[2], occupied_interval(shapes[best[2]].line, box)))
     return out
+
+
+ADJACENT_MAX = 1.2  # neighbours closer than this × their extent are packed side by side
+ADJACENT_MIN = 0.15  # closer than this is the same car detected twice
+
+
+def spacing_samples(
+    parked: list[tuple[float, tuple[float, float]]], total: float
+) -> list[tuple[float, float]]:
+    """(position, space length) samples from neighbouring parked cars, as fractions of S.
+
+    The spacing between the centres of two cars parked next to each other is the curb one
+    car takes: its length when parallel parked, about its width when parked at an angle.
+    Pairs with a gap between them (or a missed car) are skipped.
+    """
+    if total <= 0:
+        return []
+    out = []
+    for (c0, (a0, b0)), (c1, (a1, b1)) in zip(parked, parked[1:], strict=False):
+        extent = min(b0 - a0, b1 - a1)
+        pitch = c1 - c0
+        if extent > 0 and ADJACENT_MIN * extent < pitch <= ADJACENT_MAX * extent:
+            out.append(((c0 + c1) / 2 / total, pitch / total))
+    return out
+
+
+def tighten(shape: ZoneShape, centre: float, interval: tuple[float, float]) -> tuple[float, float]:
+    """Limit a car's occupied stretch to about one space around its centre.
+
+    A box projected onto the curb line overstates the curb an angled car takes (its body
+    sticks out along the line), which would hide free bays next to it.
+    """
+    half = shape.car_length(centre) / 2
+    a, b = max(interval[0], centre - half), min(interval[1], centre + half)
+    return (a, b) if b > a else interval
 
 
 def free_runs(free: np.ndarray) -> list[tuple[int, int]]:
@@ -210,13 +295,17 @@ def evaluate_zones(
     results: list[ZoneResult] = []
     for zi, shape in enumerate(shapes):
         line, total = shape.line, shape.line.length
-        intervals = [a.interval for a in assignments if a.zone_index == zi and a.interval]
-        occupied = []
-        samples = []
-        for a, b in intervals:
-            occupied.append({"polygon": geom.to_norm(line.band_polygon(a, b))})
-            if total > 0 and b > a:
-                samples.append(((a + b) / 2 / total, (b - a) / total))
+        parked = sorted(
+            (line.project(ground_point(boxes[i])).s, a.interval)
+            for i, a in enumerate(assignments)
+            if a.zone_index == zi and a.interval
+        )
+        samples = spacing_samples(parked, total)
+        shape.lengths = shape.lengths + samples
+        if parked and not shape.lengths:
+            shape.default_length = float(np.median([b - a for _, (a, b) in parked]))
+        intervals = [tighten(shape, centre, interval) for centre, interval in parked]
+        occupied = [{"polygon": geom.to_norm(line.band_polygon(a, b))} for a, b in intervals]
         raw_free = bins_free(total, intervals)
         confirmed = smoother.confirmed_free(shape.zone, raw_free)
         margin = shape.zone.min_gap_cars or gap_margin

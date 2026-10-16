@@ -21,12 +21,16 @@ The system SHALL let the user draw one or more parking zones on a view's referen
 Each zone SHALL have an adjustable tolerance band (width perpendicular to the line, scaled with perspective) so vehicles parked partly inside or partly outside the drawn line are still treated as parked on that zone. The editor SHALL display the band while editing.
 
 #### Scenario: Car parked slightly outside the line
-- **WHEN** a parked car's ground contact lies outside the drawn line but within the zone's tolerance band
+- **WHEN** a parked car's footprint lies outside the drawn line but touches the zone's tolerance band or sits right beside it
 - **THEN** the car counts as occupying that zone
 
 #### Scenario: Car in the traffic lane
-- **WHEN** a vehicle's ground contact lies beyond the tolerance band (e.g. driving in the lane)
+- **WHEN** a vehicle's footprint is clearly beyond the tolerance band (e.g. driving in the lane)
 - **THEN** it does not count as occupying the zone
+
+#### Scenario: Band follows perspective regardless of drawing direction
+- **WHEN** the user draws a zone starting from the end far from the camera
+- **THEN** the wider "near" band width still applies at the end nearer the camera
 
 ### Requirement: Zone properties
 Each zone SHALL have a name and an optional minimum gap length override; zones without an override SHALL use the default estimated car length.

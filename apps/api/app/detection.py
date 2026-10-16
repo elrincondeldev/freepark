@@ -92,7 +92,6 @@ def _clip_box(x1: float, y1: float, x2: float, y2: float, w: int, h: int):
 
 
 def parse_grounding_dino(output: Any, w: int, h: int) -> list[Detection]:
-    """`{"detections": [{"bbox": [x1, y1, x2, y2], "label": str, "confidence": float}]}`"""
     out: list[Detection] = []
     for det in (output or {}).get("detections", []):
         cls = normalise_class(str(det.get("label", "")))
@@ -103,7 +102,6 @@ def parse_grounding_dino(output: Any, w: int, h: int) -> list[Detection]:
 
 
 def parse_yolo(output: Any, w: int, h: int) -> list[Detection]:
-    """YOLO-World style: `{"json_str": "{\\"Det-0\\": {x0, y0, x1, y1, score, cls}}"}`."""
     raw = output.get("json_str") if isinstance(output, dict) else output
     data = json.loads(raw) if isinstance(raw, str) else raw
     items = data.values() if isinstance(data, dict) else (data or [])
@@ -114,6 +112,49 @@ def parse_yolo(output: Any, w: int, h: int) -> list[Detection]:
         if cls and box:
             out.append(Detection(cls, float(det.get("score", 0.0)), box))
     return out
+
+
+def _area(b: tuple[float, float, float, float]) -> float:
+    return max(0.0, b[2] - b[0]) * max(0.0, b[3] - b[1])
+
+
+def _iou(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = _area(a) + _area(b) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _contains_centre(outer, inner) -> bool:
+    cx, cy = (inner[0] + inner[2]) / 2, (inner[1] + inner[3]) / 2
+    return outer[0] <= cx <= outer[2] and outer[1] <= cy <= outer[3]
+
+
+def suppress_duplicates(detections: list[Detection], iou_threshold: float = 0.5) -> list[Detection]:
+    """Clean open-vocabulary detector output.
+
+    1. Non-maximum suppression across classes: of two boxes overlapping more than
+       `iou_threshold`, keep the more confident one (one car, one box).
+    2. Drop "group" boxes that enclose the centres of two or more other detections and are
+       much larger than them: they cover a row of cars and would hide the gaps between them.
+    """
+    kept: list[Detection] = []
+    for det in sorted(detections, key=lambda d: d.conf, reverse=True):
+        if all(_iou(det.box, k.box) <= iou_threshold for k in kept):
+            kept.append(det)
+    result = []
+    for det in kept:
+        inner = [
+            k
+            for k in kept
+            if k is not det
+            and _contains_centre(det.box, k.box)
+            and _area(det.box) > 1.8 * _area(k.box)
+        ]
+        if len(inner) < 2:
+            result.append(det)
+    return result
 
 
 PARSERS: dict[str, Callable[[Any, int, int], list[Detection]]] = {
@@ -195,12 +236,9 @@ class ReplicateDetector:
             detections = self._parse(output, w, h)
         except (KeyError, TypeError, ValueError) as exc:
             raise DetectionUnavailable(f"unexpected model output: {exc}") from exc
-        return [
-            d
-            for d in detections
-            if d.conf >= self._min_conf
-            and (d.box[2] - d.box[0]) * (d.box[3] - d.box[1]) <= self._max_area
-        ]
+        return suppress_duplicates(
+            [d for d in detections if d.conf >= self._min_conf and _area(d.box) <= self._max_area]
+        )
 
     async def _predict(self, payload: dict[str, Any]) -> Any:
         """One prediction; short rate-limit windows are waited out (up to 3 attempts)."""

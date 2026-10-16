@@ -90,16 +90,43 @@ def test_cors_allows_configured_origin(client):
 
 
 @respx.mock
-def test_reanalyze_requeues_latest_frame(client):
+def test_reanalyze_requeues_latest_frame_of_watched_camera(client):
     respx.get("https://cams.test/cam.php?id=47").respond(
         200, content=JPEG, headers={"Last-Modified": LM}
     )
-    assert client.post("/api/cameras/47/reanalyze").status_code == 409  # not watched
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"type": "subscribe", "cameras": ["47"]})
         first = receive_until(ws, "analysis")
         resp = client.post("/api/cameras/47/reanalyze", params={"fresh": "true"})
-        assert resp.status_code == 202 and resp.json()["fresh"] is True
+        assert resp.status_code == 202 and resp.json()["queued"] is True
         second = receive_until(ws, "analysis")
         assert second["frameId"] == first["frameId"]
         assert second["analysedAt"] > first["analysedAt"]
+
+
+@respx.mock
+def test_reanalyze_unwatched_camera_fetches_and_analyses_now(client):
+    route = respx.get("https://cams.test/cam.php?id=47").respond(
+        200, content=JPEG, headers={"Last-Modified": LM}
+    )
+    resp = client.post("/api/cameras/47/reanalyze")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["queued"] is False and body["analysis"]["type"] == "analysis"
+    assert route.call_count == 1
+    # a second request reuses the stored image instead of fetching again
+    assert client.post("/api/cameras/47/reanalyze").status_code == 200
+    assert route.call_count == 1
+    # and the result is replayed to the next subscriber
+    assert [m["type"] for m in client.app.state.services.manager.replay("47")] == [
+        "frame",
+        "analysis",
+    ]
+
+
+@respx.mock
+def test_reanalyze_unreachable_camera_is_502(client):
+    respx.get("https://cams.test/cam.php?id=99").respond(200, content=b"")
+    resp = client.post("/api/cameras/99/reanalyze")
+    assert resp.status_code == 502
+    assert "could not be reached" in resp.json()["detail"]

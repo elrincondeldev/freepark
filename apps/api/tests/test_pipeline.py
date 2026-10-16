@@ -70,7 +70,7 @@ async def test_known_view_reports_occupancy(env):
     assert msg["totalAvailable"] == z["spaces"] >= 1
     for a in z["available"]:
         assert all(0 <= x <= 1 and 0 <= y <= 1 for x, y in a["polygon"])
-    assert len(repo.length_samples(zone.id)) == 2  # car lengths learned
+    assert repo.length_samples(zone.id) == []  # cars are not neighbours: no spacing learned
 
 
 async def test_unknown_view_has_vehicles_but_no_availability(env):

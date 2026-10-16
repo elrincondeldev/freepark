@@ -34,7 +34,7 @@ export function ZoneForm({
         onChange={(e) => update({ name: e.target.value })}
       />
       <Slider
-        label="Band width (near end)"
+        label="Band width near the camera"
         value={draft.bandNear}
         min={0.004}
         max={0.12}
@@ -43,7 +43,7 @@ export function ZoneForm({
         onChange={(bandNear) => update({ bandNear })}
       />
       <Slider
-        label="Band width (far end)"
+        label="Band width far from the camera"
         value={draft.bandFar}
         min={0.004}
         max={0.12}

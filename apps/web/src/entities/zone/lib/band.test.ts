@@ -1,4 +1,4 @@
-import { bandPolygon, midpoints } from './band'
+import { bandPolygon, endBands, midpoints } from './band'
 
 test('band polygon surrounds a horizontal line with the given half-width', () => {
   const poly = bandPolygon(
@@ -42,4 +42,37 @@ test('needs two points; midpoints between consecutive points', () => {
     [0.5, 0.5],
     [1, 0.5],
   ])
+})
+
+test('the wide end of the band is always the one nearer the camera', () => {
+  // drawn bottom → top (near → far) and top → bottom (far → near): same band shape
+  expect(
+    endBands(
+      [
+        [0.5, 0.9],
+        [0.5, 0.1],
+      ],
+      0.04,
+      0.01,
+    ),
+  ).toEqual([0.04, 0.01])
+  expect(
+    endBands(
+      [
+        [0.5, 0.1],
+        [0.5, 0.9],
+      ],
+      0.04,
+      0.01,
+    ),
+  ).toEqual([0.01, 0.04])
+  const down = bandPolygon(
+    [
+      [0.5, 0.1],
+      [0.5, 0.9],
+    ],
+    0.04,
+    0.01,
+  )
+  expect(Math.abs(down[1][0] - down[2][0])).toBeCloseTo(0.08) // wide at the bottom point
 })

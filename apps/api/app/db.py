@@ -51,6 +51,11 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX idx_samples_zone ON zone_length_samples(zone_id);
     """,
+    # 2 — samples now hold the spacing between neighbouring parked cars (space length),
+    # not each car's projected extent; the old values would distort space counts.
+    """
+    DELETE FROM zone_length_samples;
+    """,
 ]
 
 MAX_LENGTH_SAMPLES = 60

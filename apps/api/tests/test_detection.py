@@ -8,6 +8,7 @@ import pytest
 
 from app.config import Settings
 from app.detection import (
+    Detection,
     DetectionDisabled,
     DetectionUnavailable,
     DisabledDetector,
@@ -18,6 +19,7 @@ from app.detection import (
     normalise_class,
     parse_grounding_dino,
     parse_yolo,
+    suppress_duplicates,
 )
 
 
@@ -208,3 +210,22 @@ async def test_fake_detector_fixture_and_determinism(tmp_path):
     assert dets[0].box == (0, 0, 0.1, 0.1)
     fake = FakeDetector()
     assert await fake.detect(jpeg()) == await fake.detect(jpeg())
+
+
+def test_suppress_duplicates_keeps_most_confident_of_overlapping_boxes():
+    a = Detection("car", 0.9, (0.1, 0.1, 0.3, 0.3))
+    dup = Detection("van", 0.4, (0.11, 0.1, 0.31, 0.3))  # same car, other label
+    other = Detection("car", 0.5, (0.5, 0.5, 0.6, 0.6))
+    assert suppress_duplicates([dup, a, other]) == [a, other]
+
+
+def test_suppress_duplicates_drops_group_boxes():
+    cars = [Detection("car", 0.6, (0.1 + i * 0.1, 0.5, 0.18 + i * 0.1, 0.6)) for i in range(3)]
+    row = Detection("car", 0.7, (0.08, 0.45, 0.4, 0.65))  # one box around the whole row
+    assert suppress_duplicates([row, *cars]) == sorted(cars, key=lambda d: -d.conf)
+
+
+def test_suppress_duplicates_keeps_a_car_with_one_box_inside():
+    van = Detection("van", 0.8, (0.1, 0.1, 0.4, 0.4))
+    wheel_box = Detection("car", 0.3, (0.2, 0.3, 0.25, 0.35))  # spurious inner box
+    assert van in suppress_duplicates([van, wheel_box])
