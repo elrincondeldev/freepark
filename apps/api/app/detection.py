@@ -203,6 +203,7 @@ class ReplicateDetector:
         max_box_area: float = 1.0,
         timeout: float = 90.0,
         max_concurrent: int = 4,
+        semaphore: asyncio.Semaphore | None = None,
         max_rate_limit_wait: float = 20.0,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -217,7 +218,7 @@ class ReplicateDetector:
         self._min_conf = min_confidence
         self._max_area = max_box_area
         self._timeout = timeout
-        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._semaphore = semaphore or asyncio.Semaphore(max_concurrent)
         self._clock = clock
         self._sleep = sleep
         self._max_wait = max_rate_limit_wait
@@ -257,7 +258,9 @@ class ReplicateDetector:
             except Exception as exc:
                 retry = _retry_after(exc)
                 if retry is None:
-                    raise DetectionUnavailable(f"prediction failed: {exc}") from exc
+                    if getattr(exc, "status", None) in (401, 403):
+                        raise DetectionUnavailable("Replicate rejected this API key") from exc
+                    raise DetectionUnavailable("prediction failed") from exc
                 self._blocked_until = self._clock() + retry
                 if attempt == attempts - 1 or retry > self._max_wait:
                     raise DetectionUnavailable(f"rate limited for {retry:.0f}s") from exc
@@ -266,7 +269,7 @@ class ReplicateDetector:
 
 class DisabledDetector:
     async def detect(self, jpeg: bytes) -> list[Detection]:
-        raise DetectionDisabled("REPLICATE_API_TOKEN is not configured")
+        raise DetectionDisabled("Add your Replicate API key to enable analysis")
 
 
 # --- Fake ----------------------------------------------------------------------
@@ -313,13 +316,15 @@ class FakeDetector:
         return [Detection("car", 0.9, slot) for slot in self._slots if rng.random() < 0.7]
 
 
-def build_detector(settings) -> Detector:
+def build_detector(
+    settings, token: str | None = None, semaphore: asyncio.Semaphore | None = None
+) -> Detector:
     if settings.detector == "fake":
         return FakeDetector(settings.fake_detections_file)
-    if not settings.replicate_api_token:
+    if not token:
         return DisabledDetector()
     return ReplicateDetector(
-        replicate_runner(settings.replicate_api_token),
+        replicate_runner(token),
         settings.replicate_model,
         settings.replicate_input_template,
         settings.replicate_output_format,
@@ -328,4 +333,5 @@ def build_detector(settings) -> Detector:
         max_box_area=settings.detection_max_box_area,
         timeout=settings.replicate_timeout_seconds,
         max_concurrent=settings.max_concurrent_predictions,
+        semaphore=semaphore,
     )

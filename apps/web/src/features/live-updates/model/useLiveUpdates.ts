@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useCameraStore } from '@/entities/camera'
 import { subscribeMessage, useFeedStore, type ServerMessage } from '@/entities/feed'
+import { useReplicateKeyStore } from '@/entities/replicate-key'
 import { defaultWsUrl, WsClient } from '@/shared/lib'
 
 /**
@@ -8,11 +9,13 @@ import { defaultWsUrl, WsClient } from '@/shared/lib'
  * message into the feed store. Mount once at the app root.
  */
 export function useLiveUpdates(url?: string) {
+  const replicateApiKey = useReplicateKeyStore((s) => s.key)
   useEffect(() => {
     const feed = useFeedStore.getState()
+    feed.clearAnalyses()
     const client = new WsClient<ServerMessage>({
       url: url ?? defaultWsUrl(),
-      subscribeMessage,
+      subscribeMessage: (cameras) => subscribeMessage(cameras, replicateApiKey),
       onMessage: (msg) => useFeedStore.getState().handle(msg),
       onState: (state) => feed.setConnection(state),
     })
@@ -29,5 +32,5 @@ export function useLiveUpdates(url?: string) {
       unsubscribe()
       client.close()
     }
-  }, [url])
+  }, [url, replicateApiKey])
 }

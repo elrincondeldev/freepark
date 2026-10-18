@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from app.frames import FrameStore
-from app.monitor import CameraMonitor, CameraState, MonitorConfig, WatchManager
+from app.monitor import CameraMonitor, CameraState, MonitorConfig, WatchManager, monitor_key
 from app.source import UNCHANGED, Fetched, FetchError
 
 JPEG = b"\xff\xd8\xff"
@@ -80,7 +80,7 @@ def manager_factory(tmp_path):
     created = []
 
     def factory(fetcher_results=None):
-        def monitor_factory(camera_id, state, emit):
+        def monitor_factory(camera_id, token, state, emit):
             m = CameraMonitor(
                 camera_id,
                 FakeFetcher(fetcher_results),
@@ -103,7 +103,7 @@ async def test_two_subscribers_share_one_monitor(manager_factory):
     a, b = Recorder(), Recorder()
     await manager.set_subscriptions(a, {"47"})
     await manager.set_subscriptions(b, {"47"})
-    assert len(created) == 1 and manager.watchers("47") == 2
+    assert len(created) == 1 and manager.watchers(monitor_key("47", None)) == 2
     await wait_for(lambda: any(m["type"] == "analysis" for m in b.messages))
     assert [m["type"] for m in a.messages] == [m["type"] for m in b.messages]
     await manager.shutdown()
@@ -115,9 +115,9 @@ async def test_monitor_stops_after_last_unsubscribe(manager_factory):
     await manager.set_subscriptions(a, {"47", "04"})
     await manager.set_subscriptions(b, {"47"})
     await manager.set_subscriptions(a, {"04"})  # a drops 47, b still watches it
-    assert "47" in manager.monitors
+    assert monitor_key("47", None) in manager.monitors
     await manager.disconnect(b)
-    assert "47" not in manager.monitors
+    assert monitor_key("47", None) not in manager.monitors
     stopped = next(m for m in created if m.camera_id == "47")
     assert not stopped.running
     calls = stopped._fetcher.calls
@@ -127,14 +127,47 @@ async def test_monitor_stops_after_last_unsubscribe(manager_factory):
     assert manager.monitors == {}
 
 
-async def test_replay_after_resubscribe(manager_factory):
+async def test_last_disconnect_clears_session_state(manager_factory):
     manager, _ = manager_factory([new_frame(1)])
     a = Recorder()
     await manager.set_subscriptions(a, {"47"})
     await wait_for(lambda: any(m["type"] == "analysis" for m in a.messages))
     await manager.disconnect(a)
-    types = [m["type"] for m in manager.replay("47")]
-    assert types == ["frame", "analysis"]
+    assert manager.replay("47") == []
+
+
+async def test_different_keys_have_isolated_analyses(tmp_path):
+    created = []
+
+    def monitor_factory(camera_id, token, state, emit):
+        async def analyse(frame):
+            return {"type": "analysis", "cameraId": camera_id, "keyLabel": token}
+
+        monitor = CameraMonitor(
+            camera_id,
+            FakeFetcher([new_frame(1)]),
+            FrameStore(tmp_path, 20),
+            analyse,
+            emit,
+            state,
+            MonitorConfig(poll_interval=0.01),
+        )
+        created.append(monitor)
+        return monitor
+
+    manager = WatchManager(monitor_factory)
+    a, b = Recorder(), Recorder()
+    await manager.set_subscriptions(a, {"47"}, "key-a")
+    await manager.set_subscriptions(b, {"47"}, "key-b")
+    await wait_for(lambda: any(m["type"] == "analysis" for m in a.messages))
+    await wait_for(lambda: any(m["type"] == "analysis" for m in b.messages))
+    assert len(created) == 2
+    assert [m["keyLabel"] for m in a.messages if m["type"] == "analysis"] == ["key-a"]
+    assert [m["keyLabel"] for m in b.messages if m["type"] == "analysis"] == ["key-b"]
+    await manager.set_subscriptions(a, {"47"}, "key-b")
+    assert monitor_key("47", "key-a") not in manager.monitors
+    assert manager.watchers(monitor_key("47", "key-b")) == 2
+    await manager.shutdown()
 
 
 async def test_intermediate_frames_skipped_while_analysis_slow(tmp_path):

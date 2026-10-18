@@ -45,10 +45,19 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                     cameras.add(normalize_camera_id(str(item)))
                 except InvalidCameraId:
                     continue
-            added = await manager.set_subscriptions(conn, cameras)
+            token = msg.get("replicateApiKey")
+            if token is not None and (
+                not isinstance(token, str)
+                or len(token) > 512
+                or any(char.isspace() for char in token)
+            ):
+                await conn.send_json({"type": "error", "message": "invalid Replicate API key"})
+                continue
+            token = token or None
+            added = await manager.set_subscriptions(conn, cameras, token)
             await conn.send_json({"type": "subscribed", "cameras": sorted(cameras)})
             for camera_id in sorted(added):
-                for replay in manager.replay(camera_id):
+                for replay in manager.replay(camera_id, token):
                     await conn.send_json(replay)
     except WebSocketDisconnect:
         pass

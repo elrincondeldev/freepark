@@ -22,7 +22,7 @@ apps/api   Python + FastAPI + OpenCV, SQLite, Replicate   → see apps/api/READM
 ### With Docker
 
 ```bash
-cp .env.example .env          # then set REPLICATE_API_TOKEN (optional: DETECTOR=fake)
+cp .env.example .env          # optional: set DETECTOR=fake for local UI work
 docker compose up --build
 ```
 
@@ -41,8 +41,8 @@ npm run dev:api     # FastAPI on :4000 (reads .env from the repo root)
 npm run dev         # Vite on :5173, proxies /api and /ws to :4000
 ```
 
-Without a Replicate token, images still stream and the cards show **AI disabled**. Set
-`DETECTOR=fake` to get deterministic pretend detections for UI work.
+Without a Replicate key saved in the browser, images still stream and the cards show
+**AI disabled**. Set `DETECTOR=fake` to get deterministic pretend detections for UI work.
 
 ```bash
 npm test            # web (Vitest) + api (pytest)
@@ -50,6 +50,12 @@ npm run lint        # ESLint + Prettier + Ruff
 ```
 
 ## Using it
+
+Use **Add API key** in the header to save your own Replicate key in this browser. You can
+replace or remove it there later. The key is sent to the API over the live connection and
+is not written to the server database. Use HTTPS in production: browser storage is not
+encrypted, and anyone with access to this browser profile or malicious scripts on the
+site could read the key.
 
 1. **Add a camera.** Paste its link (`https://camaras.vigo.org/webcam/cam.php?id=47`) or
    type its number (`47`, `04`). A preview confirms the camera is reachable.

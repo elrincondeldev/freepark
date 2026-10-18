@@ -4,12 +4,12 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 
 from app.camera_ids import InvalidCameraId, normalize_camera_id, parse_camera_input
 from app.frames import make_frame_id
-from app.monitor import CameraState, FrameInfo, frame_message
+from app.monitor import FrameInfo
 from app.services import Services, get_services
 from app.source import FetchError
 
@@ -77,32 +77,34 @@ async def _latest_frame(svc: Services, camera_id: str) -> FrameInfo:
 
 
 @router.post("/{camera_id}/reanalyze")
-async def reanalyze(camera_id: str, svc: Svc, response: Response, fresh: bool = False):
+async def reanalyze(
+    camera_id: str,
+    svc: Svc,
+    response: Response,
+    fresh: bool = False,
+    replicate_api_key: Annotated[str | None, Header(max_length=512)] = None,
+):
     """Re-run analysis of a camera's latest image.
 
-    `fresh=true` asks the model again (one prediction); otherwise cached detections are
-    reused and only views/zones are re-evaluated. A watched camera is re-queued on its
-    monitor (202; the result arrives over the WebSocket). Any other camera is analysed
-    right away from its latest stored image, or a freshly fetched one (200, result in the
-    body and broadcast to subscribers).
+    `fresh=true` asks the model again for a watched camera; otherwise its cached detections
+    are reused. A watched camera is re-queued on its key-specific monitor (202; the result
+    arrives over the WebSocket). Any other camera is analysed right away from its latest
+    stored image, or a freshly fetched one (200, result in the body).
     """
     cam = _camera_id(camera_id)
-    if fresh:
-        svc.analyzer.forget_detections(cam)
+    if replicate_api_key and any(char.isspace() for char in replicate_api_key):
+        raise HTTPException(400, "invalid Replicate API key")
     svc.views.invalidate(cam)
-    if svc.manager.requeue(cam):
+    if svc.manager.requeue(cam, replicate_api_key, fresh):
         response.status_code = 202
         return {"cameraId": cam, "queued": True, "fresh": fresh}
 
     frame = await _latest_frame(svc, cam)
+    analyzer = svc.analyzer_for(replicate_api_key)
     try:
-        analysis = await svc.analyzer(frame)
+        analysis = await analyzer(frame)
     except Exception as exc:
         raise HTTPException(500, f"analysis failed: {exc}") from exc
-    state = svc.manager.states.setdefault(cam, CameraState())
-    state.frame_msg, state.analysis_msg = frame_message(frame), analysis
-    await svc.manager.broadcast(cam, state.frame_msg)
-    await svc.manager.broadcast(cam, analysis)
     return {"cameraId": cam, "queued": False, "fresh": fresh, "analysis": analysis}
 
 

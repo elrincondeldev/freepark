@@ -195,12 +195,29 @@ async def test_concurrency_is_bounded():
 
 
 async def test_disabled_detector_and_factory(tmp_path):
-    s = Settings(_env_file=None, detector="replicate", replicate_api_token=None)
+    s = Settings(_env_file=None, detector="replicate")
     det = build_detector(s)
     assert isinstance(det, DisabledDetector)
     with pytest.raises(DetectionDisabled):
         await det.detect(jpeg())
     assert isinstance(build_detector(Settings(_env_file=None, detector="fake")), FakeDetector)
+
+
+async def test_factory_uses_the_callers_key(monkeypatch):
+    tokens = []
+
+    def runner_for(token):
+        tokens.append(token)
+
+        async def run(model, payload):
+            return {"detections": []}
+
+        return run
+
+    monkeypatch.setattr("app.detection.replicate_runner", runner_for)
+    detector = build_detector(Settings(_env_file=None, detector="replicate"), "user-key")
+    await detector.detect(jpeg())
+    assert tokens == ["user-key"]
 
 
 async def test_fake_detector_fixture_and_determinism(tmp_path):

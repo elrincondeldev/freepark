@@ -26,7 +26,6 @@ Every setting is an environment variable (also read from `.env`). See `../../.en
 | `POLL_INTERVAL_SECONDS` | `5` | Conditional poll interval per watched camera |
 | `FRAME_RETENTION` | `20` | Frames kept per camera (exemplars are stored separately) |
 | `DETECTOR` | `replicate` | `replicate` or `fake` (deterministic boxes, no token needed) |
-| `REPLICATE_API_TOKEN` | – | Missing → frames stream with status `analysis_disabled` |
 | `REPLICATE_MODEL` | Grounding DINO (pinned version) | `owner/name:version` |
 | `REPLICATE_INPUT_TEMPLATE` | `{"image": "{image}", "query": "car", …}` | JSON input; `"{image}"` becomes a data URI |
 | `REPLICATE_OUTPUT_FORMAT` | `grounding_dino` | Output parser: `grounding_dino` or `yolo` |
@@ -58,7 +57,7 @@ half-widths as a fraction of the image **width**, at the end of the line nearer 
 | `GET /api/cameras/probe?input=<url or id>` | – | `200 {cameraId, frameId, capturedAt, url}`; `400` bad input; `502` camera unreachable / empty image |
 | `GET /api/cameras/{id}/probe` | – | same as above for a bare id (`4` → `04`) |
 | `GET /api/cameras/{id}/frames/{frameId}.jpg` | – | JPEG, `Cache-Control: immutable`; `404` when pruned |
-| `POST /api/cameras/{id}/reanalyze?fresh=` | – | Re-runs analysis of the camera's latest image; works for any camera. Watched camera: `202 {queued: true}`, result follows over the WebSocket. Otherwise analysed right away from the latest stored (or freshly fetched) image: `200 {queued: false, analysis}`, also broadcast. `fresh=true` asks the model again (one prediction). `502` if no image can be obtained |
+| `POST /api/cameras/{id}/reanalyze?fresh=` | `Replicate-Api-Key` header (optional) | Re-runs analysis of the camera's latest image using the caller's key. Watched camera with the same key: `202 {queued: true}`, result follows over the WebSocket; `fresh=true` forces a new prediction. An unwatched camera is analysed right away without retaining per-user state: `200 {queued: false, analysis}` (a new prediction). `502` if no image can be obtained |
 | `GET /api/cameras/{id}/views` | – | `[View]` |
 | `POST /api/cameras/{id}/views` | `{frameId, name}` | `201 View` — saves that frame as the view's reference |
 | `PATCH /api/views/{viewId}` | `{name}` | `View` |
@@ -82,7 +81,7 @@ Client → server (send the full set on connect and whenever it changes; ids are
 invalid ones ignored, at most 24):
 
 ```json
-{"type": "subscribe", "cameras": ["47", "04"]}
+{"type": "subscribe", "cameras": ["47", "04"], "replicateApiKey": "your-key"}
 ```
 
 Server → client:
@@ -113,6 +112,9 @@ Server → client:
 {"type": "error", "message": "unknown message"}
 ```
 
-On subscribe, the latest `camera_status` (if offline), `frame` and `analysis` of each newly
-subscribed camera are replayed so the UI can render immediately. Polling of a camera stops as
-soon as no connection subscribes to it.
+The key is optional: without it, frames still stream and analysis reports
+`analysis_disabled` (unless `DETECTOR=fake`). It is held only in memory while the connection
+is active and is never echoed in server messages. Analyses are isolated by key; connections
+using different keys never receive each other's results. On subscribe, the latest
+`camera_status` (if offline), `frame` and `analysis` for that key are replayed. Polling stops
+when the last connection using that camera and key disconnects.

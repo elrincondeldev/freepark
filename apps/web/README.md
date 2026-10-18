@@ -39,6 +39,7 @@ hooks, business rules), `api/` (requests), `lib/` (pure helpers).
 - **feed**: the live stream per camera. Server message types, `useFeedStore`, display
   status, `useDisplayedAnalysis` (keeps overlays tied to the frame on screen), and the UI
   to show it: `FeedViewport`, `ParkingOverlay`, `FreeSpacesChip`, `FeedStatusBadge`.
+- **replicate-key**: the user's Replicate API key, stored separately in browser storage.
 - **view**: saved camera viewpoints (`viewApi`).
 - **zone**: curb zones (`zoneApi`) and band geometry (`bandPolygon`).
 

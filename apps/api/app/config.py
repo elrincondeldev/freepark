@@ -28,7 +28,6 @@ class Settings(BaseSettings):
 
     # Detection
     detector: Literal["replicate", "fake"] = "replicate"
-    replicate_api_token: str | None = None
     replicate_model: str = (
         "adirik/grounding-dino:efd10a8ddc57ea28773327e881ce95e20cc1d734c589f7dd01d2036921ed78aa"
     )
@@ -74,11 +73,6 @@ class Settings(BaseSettings):
         if value in ("", None):
             return cls.model_fields[info.field_name].default
         return value
-
-    @field_validator("replicate_api_token", mode="before")
-    @classmethod
-    def _blank_token_is_none(cls, value: object) -> object:
-        return value or None
 
     @property
     def frames_dir(self) -> Path:

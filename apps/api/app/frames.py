@@ -38,7 +38,7 @@ class FrameStore:
         directory = self._camera_dir(camera_id)
         directory.mkdir(parents=True, exist_ok=True)
         target = directory / f"{frame_id}.jpg"
-        tmp = target.with_suffix(".tmp")
+        tmp = target.with_name(f"{frame_id}.{uuid.uuid4().hex}.tmp")
         tmp.write_bytes(data)
         tmp.replace(target)
         self.prune(camera_id, protected)

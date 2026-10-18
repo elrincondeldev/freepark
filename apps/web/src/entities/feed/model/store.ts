@@ -22,6 +22,7 @@ interface FeedState {
   setConnection: (c: ConnectionState) => void
   handle: (msg: ServerMessage, now?: number) => void
   forget: (cameraId: string) => void
+  clearAnalyses: () => void
   /** Mark a camera as being re-analysed until its next analysis (or a timeout). */
   markReanalysing: (cameraId: string) => void
   cancelReanalysing: (cameraId: string) => void
@@ -42,6 +43,15 @@ export const useFeedStore = create<FeedState>()((set, get) => ({
       delete next[cameraId]
       return { cameras: next }
     }),
+  clearAnalyses: () =>
+    set((s) => ({
+      cameras: Object.fromEntries(
+        Object.entries(s.cameras).map(([id, feed]) => [
+          id,
+          { ...feed, analysis: undefined, reanalysing: false },
+        ]),
+      ),
+    })),
   markReanalysing: (cameraId) => {
     set((s) => withFlag(s, cameraId, true))
     const marked = get().cameras[cameraId]?.analysis

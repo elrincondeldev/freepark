@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -45,10 +46,18 @@ def build_services(settings: Settings, http: httpx.AsyncClient) -> Services:
         )
     )
     views = ViewRegistry(repo, store, matcher, settings.view_mask, settings.view_max_exemplars)
-    analyzer = Analyzer(settings, repo, views, build_detector(settings))
+    prediction_slots = asyncio.Semaphore(settings.max_concurrent_predictions)
 
-    def monitor_factory(camera_id: str, state: CameraState, emit: Emit) -> CameraMonitor:
-        return CameraMonitor(camera_id, fetcher, store, analyzer, emit, state, config)
+    def analyzer_for(token: str | None) -> Analyzer:
+        return Analyzer(settings, repo, views, build_detector(settings, token, prediction_slots))
+
+    def monitor_factory(
+        camera_id: str, token: str | None, state: CameraState, emit: Emit
+    ) -> CameraMonitor:
+        analyzer = analyzer_for(token)
+        return CameraMonitor(
+            camera_id, fetcher, store, analyzer, emit, state, config, analyzer.forget_detections
+        )
 
     return Services(
         settings=settings,
@@ -58,7 +67,7 @@ def build_services(settings: Settings, http: httpx.AsyncClient) -> Services:
         fetcher=fetcher,
         manager=WatchManager(monitor_factory),
         views=views,
-        analyzer=analyzer,
+        analyzer_for=analyzer_for,
     )
 
 

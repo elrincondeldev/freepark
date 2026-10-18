@@ -58,4 +58,8 @@ export type ServerMessage =
   | { type: 'subscribed'; cameras: string[] }
   | { type: 'error'; message: string }
 
-export const subscribeMessage = (cameras: string[]) => ({ type: 'subscribe', cameras })
+export const subscribeMessage = (cameras: string[], replicateApiKey: string) => ({
+  type: 'subscribe',
+  cameras,
+  ...(replicateApiKey ? { replicateApiKey } : {}),
+})

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { reanalyzeCamera, useCameraFeed, useFeedStore } from '@/entities/feed'
+import { useReplicateKeyStore } from '@/entities/replicate-key'
 import { ApiError } from '@/shared/api'
 import { Button, cn, RefreshIcon, toast } from '@/shared/ui'
 
@@ -29,7 +30,7 @@ export function ReanalyzeButton({ cameraId }: { cameraId: string }) {
     setSending(true)
     markReanalysing(cameraId)
     try {
-      const result = await reanalyzeCamera(cameraId, true)
+      const result = await reanalyzeCamera(cameraId, true, useReplicateKeyStore.getState().key)
       // Analysed immediately (camera not being monitored): show it without waiting for the socket.
       if (result.analysis) useFeedStore.getState().handle(result.analysis)
     } catch (err) {

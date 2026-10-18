@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -83,6 +84,7 @@ class CameraMonitor:
         emit: Emit,
         state: CameraState,
         config: MonitorConfig,
+        forget_detections: Callable[[str], None] | None = None,
     ) -> None:
         self.camera_id = camera_id
         self._fetcher = fetcher
@@ -91,6 +93,7 @@ class CameraMonitor:
         self._emit = emit
         self.state = state
         self._config = config
+        self._forget_detections = forget_detections
         self._pending: FrameInfo | None = None
         self._wakeup = asyncio.Event()
         self._tasks: list[asyncio.Task[None]] = []
@@ -160,11 +163,13 @@ class CameraMonitor:
         self._pending = frame  # latest wins: overwrite any frame not yet analysed
         self._wakeup.set()
 
-    def requeue_latest(self) -> bool:
+    def requeue_latest(self, fresh: bool = False) -> bool:
         """Re-analyse the latest frame (e.g. after its views or zones changed).
 
         Returns False when there is no frame yet. A frame already waiting is analysed anyway.
         """
+        if fresh and self._forget_detections:
+            self._forget_detections(self.camera_id)
         if self._last_frame is None:
             return False
         if self._pending is None:
@@ -215,45 +220,57 @@ class Connection(Protocol):
     async def send_json(self, data: Any) -> None: ...
 
 
-MonitorFactory = Callable[[str, CameraState, Emit], CameraMonitor]
+MonitorKey = tuple[str, str]
+MonitorFactory = Callable[[str, str | None, CameraState, Emit], CameraMonitor]
+
+
+def monitor_key(camera_id: str, token: str | None) -> MonitorKey:
+    return camera_id, hashlib.sha256((token or "").encode()).hexdigest()
 
 
 @dataclass
 class WatchManager:
     monitor_factory: MonitorFactory
-    subscriptions: dict[Connection, set[str]] = field(default_factory=dict)
-    monitors: dict[str, CameraMonitor] = field(default_factory=dict)
-    states: dict[str, CameraState] = field(default_factory=dict)
+    subscriptions: dict[Connection, set[MonitorKey]] = field(default_factory=dict)
+    monitors: dict[MonitorKey, CameraMonitor] = field(default_factory=dict)
+    states: dict[MonitorKey, CameraState] = field(default_factory=dict)
 
-    def watchers(self, camera_id: str) -> int:
-        return sum(camera_id in cams for cams in self.subscriptions.values())
+    def watchers(self, key: MonitorKey) -> int:
+        return sum(key in cams for cams in self.subscriptions.values())
 
-    async def set_subscriptions(self, conn: Connection, cameras: set[str]) -> set[str]:
+    async def set_subscriptions(
+        self, conn: Connection, cameras: set[str], token: str | None = None
+    ) -> set[str]:
         """Replace a connection's subscription set. Returns the newly added cameras."""
         previous = self.subscriptions.get(conn, set())
-        self.subscriptions[conn] = set(cameras)
-        added, removed = cameras - previous, previous - cameras
-        for camera_id in added:
-            if camera_id not in self.monitors:
-                state = self.states.setdefault(camera_id, CameraState())
-                monitor = self.monitor_factory(camera_id, state, self.broadcast)
-                self.monitors[camera_id] = monitor
+        next_keys = {monitor_key(camera_id, token) for camera_id in cameras}
+        self.subscriptions[conn] = next_keys
+        added, removed = next_keys - previous, previous - next_keys
+        for key in added:
+            if key not in self.monitors:
+                state = self.states.setdefault(key, CameraState())
+
+                async def emit(_camera_id: str, message: Message, key: MonitorKey = key) -> None:
+                    await self.broadcast(key, message)
+
+                monitor = self.monitor_factory(key[0], token, state, emit)
+                self.monitors[key] = monitor
                 monitor.start()
-        for camera_id in removed:
-            await self._maybe_stop(camera_id)
-        return added
+        for key in removed:
+            await self._maybe_stop(key)
+        return {camera_id for camera_id, _ in added}
 
     async def disconnect(self, conn: Connection) -> None:
-        cameras = self.subscriptions.pop(conn, set())
-        for camera_id in cameras:
-            await self._maybe_stop(camera_id)
+        for key in self.subscriptions.pop(conn, set()):
+            await self._maybe_stop(key)
 
-    async def _maybe_stop(self, camera_id: str) -> None:
-        if self.watchers(camera_id) == 0 and camera_id in self.monitors:
-            await self.monitors.pop(camera_id).stop()
+    async def _maybe_stop(self, key: MonitorKey) -> None:
+        if self.watchers(key) == 0 and key in self.monitors:
+            await self.monitors.pop(key).stop()
+            self.states.pop(key, None)
 
-    def replay(self, camera_id: str) -> list[Message]:
-        state = self.states.get(camera_id)
+    def replay(self, camera_id: str, token: str | None = None) -> list[Message]:
+        state = self.states.get(monitor_key(camera_id, token))
         if state is None:
             return []
         msgs: list[Message] = []
@@ -265,18 +282,23 @@ class WatchManager:
             msgs.append(state.analysis_msg)
         return msgs
 
-    async def broadcast(self, camera_id: str, message: Message) -> None:
-        targets = [c for c, cams in self.subscriptions.items() if camera_id in cams]
+    async def broadcast(self, key: MonitorKey, message: Message) -> None:
+        targets = [c for c, keys in self.subscriptions.items() if key in keys]
         for conn in targets:
             try:
                 await conn.send_json(message)
             except Exception:  # a dead socket is cleaned up by its own handler
                 log.debug("send to subscriber failed", exc_info=True)
 
-    def requeue(self, camera_id: str) -> bool:
+    def requeue(self, camera_id: str, token: str | None = None, fresh: bool = False) -> bool:
         """Re-analyse a watched camera's latest frame; False if it is not being monitored."""
-        monitor = self.monitors.get(camera_id)
-        return monitor is not None and monitor.requeue_latest()
+        monitor = self.monitors.get(monitor_key(camera_id, token))
+        return monitor is not None and monitor.requeue_latest(fresh)
+
+    def requeue_all(self, camera_id: str) -> None:
+        for key, monitor in self.monitors.items():
+            if key[0] == camera_id:
+                monitor.requeue_latest()
 
     async def shutdown(self) -> None:
         for monitor in list(self.monitors.values()):

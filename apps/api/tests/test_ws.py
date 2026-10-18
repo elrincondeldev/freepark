@@ -1,7 +1,11 @@
 import time
 
 import respx
+from fastapi.testclient import TestClient
 
+from app import main as app_main
+from app.detection import Detection
+from app.monitor import monitor_key
 from tests.fixtures import frame_bytes
 
 JPEG = frame_bytes("47_1791962972.jpg")
@@ -58,14 +62,62 @@ def test_unsubscribe_and_disconnect_stop_polling(client):
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"type": "subscribe", "cameras": ["47", "04"]})
         ws.receive_json()
-        assert set(manager.monitors) == {"47", "04"}
+        assert set(manager.monitors) == {monitor_key("47", None), monitor_key("04", None)}
         ws.send_json({"type": "subscribe", "cameras": ["04"]})
         receive_until(ws, "subscribed")
-        assert set(manager.monitors) == {"04"}
+        assert set(manager.monitors) == {monitor_key("04", None)}
     deadline = time.monotonic() + 2
     while manager.monitors and time.monotonic() < deadline:
         time.sleep(0.01)
     assert manager.monitors == {}
+
+
+@respx.mock
+def test_key_change_replaces_monitor_without_echoing_key(client):
+    respx.get("https://cams.test/cam.php?id=47").respond(
+        200, content=JPEG, headers={"Last-Modified": LM}
+    )
+    manager = client.app.state.services.manager
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "subscribe", "cameras": ["47"], "replicateApiKey": "key-a"})
+        assert ws.receive_json() == {"type": "subscribed", "cameras": ["47"]}
+        receive_until(ws, "analysis")
+        assert set(manager.monitors) == {monitor_key("47", "key-a")}
+        ws.send_json({"type": "subscribe", "cameras": ["47"], "replicateApiKey": "key-b"})
+        assert ws.receive_json() == {"type": "subscribed", "cameras": ["47"]}
+        assert set(manager.monitors) == {monitor_key("47", "key-b")}
+        assert manager.replay("47", "key-a") == []
+
+
+@respx.mock
+def test_two_users_receive_results_from_their_own_keys(monkeypatch, settings):
+    settings.detector = "replicate"
+    respx.get("https://cams.test/cam.php?id=47").respond(
+        200, content=JPEG, headers={"Last-Modified": LM}
+    )
+
+    def detector_for(_settings, token, _semaphore):
+        class KeyDetector:
+            async def detect(self, _jpeg):
+                confidence = 0.4 if token == "key-a" else 0.9
+                return [Detection("car", confidence, (0.1, 0.1, 0.2, 0.2))]
+
+        return KeyDetector()
+
+    monkeypatch.setattr(app_main, "build_detector", detector_for)
+    with (
+        TestClient(app_main.create_app(settings)) as client,
+        client.websocket_connect("/ws") as a,
+        client.websocket_connect("/ws") as b,
+    ):
+        a.send_json({"type": "subscribe", "cameras": ["47"], "replicateApiKey": "key-a"})
+        b.send_json({"type": "subscribe", "cameras": ["47"], "replicateApiKey": "key-b"})
+        first = receive_until(a, "analysis")
+        second = receive_until(b, "analysis")
+        assert first["vehicles"][0]["conf"] == 0.4
+        assert second["vehicles"][0]["conf"] == 0.9
+        assert "key-a" not in str(first)
+        assert "key-b" not in str(second)
 
 
 def test_invalid_messages(client):
@@ -74,6 +126,8 @@ def test_invalid_messages(client):
         assert ws.receive_json()["type"] == "error"
         ws.send_json({"type": "subscribe", "cameras": "47"})
         assert ws.receive_json()["type"] == "error"
+        ws.send_json({"type": "subscribe", "cameras": ["47"], "replicateApiKey": ["not-a-key"]})
+        assert ws.receive_json() == {"type": "error", "message": "invalid Replicate API key"}
 
 
 def test_cors_allows_configured_origin(client):
@@ -117,11 +171,8 @@ def test_reanalyze_unwatched_camera_fetches_and_analyses_now(client):
     # a second request reuses the stored image instead of fetching again
     assert client.post("/api/cameras/47/reanalyze").status_code == 200
     assert route.call_count == 1
-    # and the result is replayed to the next subscriber
-    assert [m["type"] for m in client.app.state.services.manager.replay("47")] == [
-        "frame",
-        "analysis",
-    ]
+    # Unwatched requests do not keep per-user state on the server.
+    assert client.app.state.services.manager.replay("47") == []
 
 
 @respx.mock

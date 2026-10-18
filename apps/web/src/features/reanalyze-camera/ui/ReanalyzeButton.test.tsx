@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useFeedStore } from '@/entities/feed'
+import { useReplicateKeyStore } from '@/entities/replicate-key'
 import { useToastStore } from '@/shared/ui'
 import { analysisMsg, frameMsg } from '@/test/factories'
 import { mockApi } from '@/test/mockApi'
@@ -9,6 +10,7 @@ import { ReanalyzeButton } from './ReanalyzeButton'
 beforeEach(() => {
   vi.unstubAllGlobals()
   useFeedStore.setState({ cameras: {} })
+  useReplicateKeyStore.getState().setKey('')
   useToastStore.setState({ toasts: [] })
   act(() => {
     useFeedStore.getState().handle(frameMsg('f1'))
@@ -27,6 +29,20 @@ test('queued re-analysis shows progress until the result arrives over the socket
   expect(button()).toBeEnabled() // never locked: you can always ask again
   act(() => useFeedStore.getState().handle(analysisMsg('f1', { analysedAt: 'later' })))
   expect(button()).toHaveTextContent('Re-analyse')
+})
+
+test('re-analysis sends the current user key in a header', async () => {
+  useReplicateKeyStore.getState().setKey('key-a')
+  const headers: HeadersInit[] = []
+  mockApi({
+    'POST /api/cameras/47/reanalyze': (_url: string, init?: RequestInit) => {
+      headers.push(init?.headers ?? {})
+      return { queued: true }
+    },
+  })
+  render(<ReanalyzeButton cameraId="47" />)
+  await userEvent.click(button())
+  expect(headers).toEqual([{ 'Replicate-Api-Key': 'key-a' }])
 })
 
 test('immediate analysis from the API is shown right away', async () => {

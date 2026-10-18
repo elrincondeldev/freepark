@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useCameraStore } from '@/entities/camera'
 import { useFeedStore } from '@/entities/feed'
 import { AddCameraForm } from '@/features/add-camera'
+import { ReplicateKeyControl } from '@/features/manage-replicate-key'
 import { SoundToggle } from '@/features/toggle-alert-sound'
 import type { ConnectionState } from '@/shared/lib'
 
@@ -23,7 +24,8 @@ export function AppHeader() {
         <div className="order-3 flex w-full justify-end sm:order-none sm:ml-auto sm:w-auto">
           {hasCameras && <AddCameraForm />}
         </div>
-        <div className="ml-auto sm:ml-0">
+        <div className="ml-auto flex items-center gap-2 sm:ml-0">
+          <ReplicateKeyControl />
           <SoundToggle />
         </div>
       </div>
