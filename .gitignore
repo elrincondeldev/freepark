@@ -18,3 +18,5 @@ apps/api/data/
 .claude/
 .kimi-code/
 .agents/
+.codegraph/
+.cursor/
