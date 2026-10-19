@@ -426,7 +426,7 @@ function Features() {
 }
 
 const SELF_HOST = `git clone ${GITHUB_URL}
-cd parking-vision
+cd freepark
 docker compose up --build`
 
 function OpenSource() {
@@ -474,7 +474,7 @@ function OpenSource() {
             <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
             <span className="h-3 w-3 rounded-full bg-[#28c840]" />
             <span className="ml-3 flex items-center gap-1.5 text-xs text-white/50">
-              <GitHubIcon width={12} height={12} /> elrincondeldev/parking-vision
+              <GitHubIcon width={12} height={12} /> elrincondeldev/freepark
             </span>
             <button
               type="button"

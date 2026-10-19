@@ -99,7 +99,7 @@ Ubuntu installs security updates automatically (unattended-upgrades is on by def
 ## 4. Start FreePark
 
 ```bash
-git clone https://github.com/elrincondeldev/parking-vision.git /opt/freepark
+git clone https://github.com/elrincondeldev/freepark.git /opt/freepark
 ```
 ```bash
 cd /opt/freepark && printf 'COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml\nDOMAIN=getfreepark.com\n' > .env

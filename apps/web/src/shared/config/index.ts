@@ -13,5 +13,5 @@ export const isAppPath = (pathname: string) =>
 /** Public address of the hosted app. */
 export const SITE_URL = 'https://getfreepark.com'
 
-export const GITHUB_REPO = 'elrincondeldev/parking-vision'
+export const GITHUB_REPO = 'elrincondeldev/freepark'
 export const GITHUB_URL = `https://github.com/${GITHUB_REPO}`
