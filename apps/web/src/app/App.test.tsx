@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { useCameraStore } from '@/entities/camera'
+import { useReplicateKeyStore } from '@/entities/replicate-key'
 import { App } from './App'
 
 class NoopSocket {
@@ -12,12 +13,14 @@ class NoopSocket {
 beforeEach(() => {
   vi.stubGlobal('WebSocket', NoopSocket)
   useCameraStore.setState({ cameras: [] })
+  useReplicateKeyStore.getState().setKey('')
 })
 
 test('shows the empty state on first visit', () => {
   render(<App />)
   expect(screen.getByText('Parking Vision')).toBeInTheDocument()
   expect(screen.getByText(/Find a free spot/)).toBeInTheDocument()
+  expect(screen.getByLabelText('Replicate API token')).toHaveFocus()
 })
 
 test('shows camera cards for watched cameras', () => {

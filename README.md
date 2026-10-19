@@ -53,8 +53,9 @@ npm run lint        # ESLint + Prettier + Ruff
 
 ## Using it
 
-Use **Add API key** in the header to save your own Replicate key in this browser. You can
-replace or remove it there later. The key is sent to the API over the live connection and
+On first visit, the **Connect AI** dialog saves a complete Replicate key automatically, or lets you continue
+without one. Open **Connect AI** in the header to add it later, or **AI connected** to
+replace or remove it. The key is sent to the API over the live connection and
 is not persisted by the API. Use HTTPS in production: browser storage is not
 encrypted, and anyone with access to this browser profile or malicious scripts on the
 site could read the key. The data export does not include the API key.
