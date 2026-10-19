@@ -5,6 +5,7 @@ import { AddCameraButton } from '@/features/add-camera'
 import { ReplicateKeyControl } from '@/features/manage-replicate-key'
 import { SoundToggle } from '@/features/toggle-alert-sound'
 import type { ConnectionState } from '@/shared/lib'
+import { LogoMark } from '@/shared/ui'
 import { DataControl } from './DataControl'
 
 export function AppHeader() {
@@ -21,9 +22,7 @@ export function AppHeader() {
             className="flex items-center gap-2.5 rounded-xl"
             aria-label="Parking Vision home"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-free text-sm font-bold text-white">
-              P
-            </span>
+            <LogoMark size={32} className="drop-shadow-sm" />
             <span className="font-semibold tracking-tight">Parking Vision</span>
           </a>
           <ConnectionPill state={connection} />

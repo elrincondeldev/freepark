@@ -1,6 +1,12 @@
-# Parking Vision
+<p align="center">
+  <img src="apps/web/public/logo.svg" width="88" height="88" alt="Parking Vision logo" />
+</p>
 
-See free street parking before you get there. The app watches public JPEG traffic cameras,
+<h1 align="center">Parking Vision</h1>
+
+<p align="center"><strong>Find a free spot before you get there.</strong></p>
+
+Parking Vision watches public JPEG traffic cameras,
 including Vigo's (`https://camaras.vigo.org/webcam/cam.php?id=NN`), detects vehicles with an
 AI model on [Replicate](https://replicate.com), and marks curb space as **occupied (red)** or
 **available (green)**. It alerts you when a space opens.

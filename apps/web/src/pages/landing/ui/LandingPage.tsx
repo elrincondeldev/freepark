@@ -8,6 +8,7 @@ import {
   CheckIcon,
   EASE_OUT,
   LocateIcon,
+  LogoMark,
   PencilIcon,
   RefreshIcon,
   SearchIcon,
@@ -149,9 +150,7 @@ function Backdrop() {
 function Logo() {
   return (
     <a href="/" className="flex items-center gap-2.5 rounded-xl" aria-label="Parking Vision home">
-      <span className="grid h-8 w-8 place-items-center rounded-xl bg-free text-sm font-bold text-white shadow-sm shadow-free/30">
-        P
-      </span>
+      <LogoMark size={32} className="drop-shadow-[0_4px_10px_rgba(16,185,129,0.3)]" />
       <span className="whitespace-nowrap font-semibold tracking-tight">Parking Vision</span>
     </a>
   )

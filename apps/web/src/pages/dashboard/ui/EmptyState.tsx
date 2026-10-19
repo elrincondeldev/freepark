@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { AddCameraForm, FinderLauncher } from '@/features/add-camera'
-import { motionPresets } from '@/shared/ui'
+import { LogoMark, motionPresets } from '@/shared/ui'
 
 export function EmptyState() {
   return (
@@ -10,8 +10,8 @@ export function EmptyState() {
       transition={motionPresets.slow}
       className="mx-auto flex max-w-xl flex-col items-center px-4 pb-16 pt-[12vh] text-center"
     >
-      <span className="mb-8 grid h-16 w-16 place-items-center rounded-2xl bg-free text-3xl font-bold text-white shadow-lg ring-8 ring-free/15">
-        P
+      <span className="mb-8 rounded-2xl shadow-lg shadow-free/25 ring-8 ring-free/15">
+        <LogoMark size={64} className="block" />
       </span>
       <h1 className="text-3xl font-semibold tracking-tight">
         Find a free spot before you get there
