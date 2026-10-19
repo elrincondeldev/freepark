@@ -1,0 +1,23 @@
+# Served for {$DOMAIN}; certificates come from Let's Encrypt automatically on first start.
+
+# www → apex, so there is one canonical address.
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# The app asks for location ("Near me") itself; nothing else needs these.
+		Permissions-Policy "geolocation=(self), camera=(), microphone=()"
+		-Server
+	}
+
+	# nginx in the web container serves the app and proxies /api and /ws to the API.
+	reverse_proxy web:80
+}

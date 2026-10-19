@@ -40,6 +40,8 @@ API. Views and zones are restored from the browser when the app opens; the API k
 temporary analysis state and camera frames. The API is also exposed
 on `localhost:${API_PORT:-4000}`.
 
+To put it online with HTTPS on your own domain, see **[DEPLOY.md](DEPLOY.md)**.
+
 ### Local development
 
 Requirements: Node 20+, [uv](https://docs.astral.sh/uv/) (Python 3.12 is installed by uv).
@@ -125,15 +127,14 @@ When it turns somewhere new, save that view too.
 
 ## Hosting a public instance
 
-The Docker setup is meant for running your own copy. Before putting it on the internet for
-other people:
+**[DEPLOY.md](DEPLOY.md)** walks through putting it online on a ~€5/month server with
+automatic HTTPS (`docker-compose.prod.yml` + Caddy). Whatever you use, keep in mind:
 
-- **Serve it over HTTPS only.** The key travels from the browser to the API; on plain HTTP
-  anyone on the network can read it. Put the `web` container behind a TLS-terminating proxy
-  (Caddy, Traefik, a load balancer…).
-- **Expose only the web container.** nginx in `web` already proxies `/api` and `/ws`; remove
-  the `api` port mapping from `docker-compose.yml` (or bind it to `127.0.0.1`) so the API is
-  not reachable directly, and set `CORS_ORIGIN` to your public URL.
+- **Serve it over HTTPS only, and expose only the proxy.** The Replicate key travels from
+  the browser to the API; on plain HTTP anyone on the network can read it.
+  `docker-compose.prod.yml` already does both: Caddy terminates HTTPS and is the only public
+  port, and `CORS_ORIGIN` is set to your domain. With your own proxy, put it in front of the
+  `web` container (which proxies `/api` and `/ws`) and don't publish the API's port.
 - **You pay for bandwidth and CPU, not AI.** The server downloads camera images and runs
   view matching (OpenCV) for everyone watching. There are no accounts or rate limits, so add
   limits at your proxy if you expect heavy use.

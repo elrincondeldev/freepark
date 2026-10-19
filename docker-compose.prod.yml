@@ -1,0 +1,47 @@
+# Production on a single server: Caddy terminates HTTPS (certificates are automatic) and is
+# the only public entry point; the web and API containers are reachable only inside Docker.
+#
+# Used together with docker-compose.yml. Put this in the server's .env so plain
+# `docker compose` commands pick up both files:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+# See DEPLOY.md.
+name: freepark
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  api:
+    ports: !reset []
+    environment:
+      CORS_ORIGIN: https://${DOMAIN:-getfreepark.com}
+    logging: *logging
+
+  web:
+    ports: !reset []
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-getfreepark.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+volumes:
+  # Certificates live here; keep it so Caddy doesn't re-request them on every restart.
+  caddy_data:
+  caddy_config:
