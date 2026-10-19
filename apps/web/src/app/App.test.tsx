@@ -19,7 +19,7 @@ beforeEach(() => {
 
 test('shows the empty state on first visit', () => {
   render(<App />)
-  expect(screen.getByText('Parking Vision')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'FreePark home' })).toBeInTheDocument()
   expect(screen.getByText(/Find a free spot/)).toBeInTheDocument()
   expect(screen.getByLabelText('Replicate API token')).toHaveFocus()
 })

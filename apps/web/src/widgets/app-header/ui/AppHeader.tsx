@@ -5,7 +5,7 @@ import { AddCameraButton } from '@/features/add-camera'
 import { ReplicateKeyControl } from '@/features/manage-replicate-key'
 import { SoundToggle } from '@/features/toggle-alert-sound'
 import type { ConnectionState } from '@/shared/lib'
-import { LogoMark } from '@/shared/ui'
+import { LogoMark, Wordmark } from '@/shared/ui'
 import { DataControl } from './DataControl'
 
 export function AppHeader() {
@@ -17,13 +17,9 @@ export function AppHeader() {
     <header className="sticky top-0 z-20 border-b border-line/70 bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
         <div className="flex items-center gap-2.5">
-          <a
-            href="/"
-            className="flex items-center gap-2.5 rounded-xl"
-            aria-label="Parking Vision home"
-          >
+          <a href="/" className="flex items-center gap-2.5 rounded-xl" aria-label="FreePark home">
             <LogoMark size={32} className="drop-shadow-sm" />
-            <span className="font-semibold tracking-tight">Parking Vision</span>
+            <Wordmark className="font-semibold tracking-tight" />
           </a>
           <ConnectionPill state={connection} />
         </div>

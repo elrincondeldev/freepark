@@ -30,7 +30,7 @@ def main() -> None:
     last: dict[str, str] = {}
     saved = {c: 0 for c in args.cameras}
     deadline = time.monotonic() + args.max_minutes * 60
-    headers = {"User-Agent": "parking-vision/0.1 (fixture capture)"}
+    headers = {"User-Agent": "FreePark/0.1 (fixture capture)"}
     with httpx.Client(timeout=10, headers=headers) as client:
         while time.monotonic() < deadline and any(n < args.per_camera for n in saved.values()):
             for cam in args.cameras:

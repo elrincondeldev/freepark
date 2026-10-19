@@ -1,5 +1,5 @@
 [project]
-name = "parking-vision-api"
+name = "freepark-api"
 version = "0.1.0"
 description = "Street parking availability from public JPEG traffic cameras"
 license = "MIT"

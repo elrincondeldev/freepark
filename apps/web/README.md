@@ -1,4 +1,4 @@
-# Parking Vision — web
+# FreePark — web
 
 React 18 + TypeScript + Tailwind v4 + Framer Motion + Zustand, built with Vite.
 The code follows **[Feature-Sliced Design](https://feature-sliced.design)** (FSD).

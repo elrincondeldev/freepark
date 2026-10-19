@@ -1,6 +1,6 @@
 {
-  "name": "Parking Vision",
-  "short_name": "Parking Vision",
+  "name": "FreePark",
+  "short_name": "FreePark",
   "description": "Find a free parking spot before you get there.",
   "start_url": "/app",
   "scope": "/",

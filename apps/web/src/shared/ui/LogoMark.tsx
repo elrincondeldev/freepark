@@ -1,7 +1,7 @@
 import { useId } from 'react'
 
 /**
- * The Parking Vision mark: a "P" whose bowl holds a camera lens, on a green tile.
+ * The FreePark mark: a "P" whose bowl holds a camera lens, on a green tile.
  * Same artwork as public/logo.svg and the favicons.
  */
 export function LogoMark({ size = 32, className }: { size?: number; className?: string }) {
@@ -37,5 +37,14 @@ export function LogoMark({ size = 32, className }: { size?: number; className?: 
       />
       <circle cx="33" cy="27" r="3.6" fill="#fff" />
     </svg>
+  )
+}
+
+/** The product name, with "Free" in the brand green. */
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <span className={className ? `whitespace-nowrap ${className}` : 'whitespace-nowrap'}>
+      <span className="text-free">Free</span>Park
+    </span>
   )
 }

@@ -23,7 +23,7 @@ async def test_new_image(fetcher):
     res = await fetcher.fetch("47")
     assert res.changed and res.data == JPEG and res.last_modified == LM
     assert res.captured_epoch == 1791962271
-    assert route.calls.last.request.headers["user-agent"].startswith("parking-vision/")
+    assert route.calls.last.request.headers["user-agent"].startswith("FreePark/")
     assert "if-modified-since" not in route.calls.last.request.headers
 
 

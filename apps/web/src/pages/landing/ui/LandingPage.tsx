@@ -9,6 +9,7 @@ import {
   EASE_OUT,
   LocateIcon,
   LogoMark,
+  Wordmark,
   PencilIcon,
   RefreshIcon,
   SearchIcon,
@@ -89,8 +90,8 @@ export function LandingPage() {
               variants={rise}
               className="mt-6 max-w-xl text-pretty text-lg leading-8 text-muted"
             >
-              Parking Vision watches public street cameras and marks free curb space in green, so
-              you know where to park before you leave home.
+              FreePark watches public street cameras and marks free curb space in green, so you know
+              where to park before you leave home.
             </motion.p>
 
             <motion.div variants={rise} className="mt-9 flex flex-wrap items-center gap-3">
@@ -149,9 +150,9 @@ function Backdrop() {
 
 function Logo() {
   return (
-    <a href="/" className="flex items-center gap-2.5 rounded-xl" aria-label="Parking Vision home">
+    <a href="/" className="flex items-center gap-2.5 rounded-xl" aria-label="FreePark home">
       <LogoMark size={32} className="drop-shadow-[0_4px_10px_rgba(16,185,129,0.3)]" />
-      <span className="whitespace-nowrap font-semibold tracking-tight">Parking Vision</span>
+      <Wordmark className="font-semibold tracking-tight" />
     </a>
   )
 }
@@ -448,8 +449,8 @@ function OpenSource() {
             Built in the open. Yours to run.
           </h2>
           <p className="mt-4 text-pretty text-lg leading-8 text-muted">
-            Parking Vision is MIT licensed. Self-host it in one command, add your city’s cameras, or
-            send a pull request. A star helps more people find it.
+            FreePark is MIT licensed. Self-host it in one command, add your city’s cameras, or send
+            a pull request. A star helps more people find it.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <GitHubStarButton size="lg" />
@@ -557,7 +558,7 @@ function Footer() {
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            aria-label="Parking Vision on GitHub"
+            aria-label="FreePark on GitHub"
             className="hover:text-ink"
           >
             <GitHubIcon width={18} height={18} />

@@ -6,7 +6,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
-    DATA_DIR=/tmp/parking-vision
+    DATA_DIR=/tmp/freepark
 
 WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./

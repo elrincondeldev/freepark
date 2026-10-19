@@ -161,7 +161,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             finally:
                 await services.manager.shutdown()
 
-    app = FastAPI(title="Parking Vision API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="FreePark API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in settings.cors_origin.split(",") if o.strip()],

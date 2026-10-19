@@ -215,7 +215,7 @@ function FinderPanel() {
           ) : failed ? (
             <Problem
               title="Can't reach the camera directory"
-              body="Check that the Parking Vision API is running, then try again."
+              body="Check that the FreePark API is running, then try again."
               onRetry={retry}
             />
           ) : (

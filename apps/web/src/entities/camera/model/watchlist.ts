@@ -16,6 +16,7 @@ interface CameraState {
   setSound: (sound: boolean) => void
 }
 
+// Keeps the project's original name so existing browsers keep their cameras.
 export const STORAGE_KEY = 'parking-vision:v1'
 export const defaultLabel = (id: string) => `Camera ${id}`
 

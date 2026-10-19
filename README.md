@@ -1,12 +1,13 @@
 <p align="center">
-  <img src="apps/web/public/logo.svg" width="88" height="88" alt="Parking Vision logo" />
+  <img src="apps/web/public/logo.svg" width="88" height="88" alt="FreePark logo" />
 </p>
 
-<h1 align="center">Parking Vision</h1>
+<h1 align="center">FreePark</h1>
 
-<p align="center"><strong>Find a free spot before you get there.</strong></p>
+<p align="center"><strong>Find a free spot before you get there.</strong><br />
+  <a href="https://getfreepark.com">getfreepark.com</a></p>
 
-Parking Vision watches public JPEG traffic cameras,
+FreePark watches public JPEG traffic cameras,
 including Vigo's (`https://camaras.vigo.org/webcam/cam.php?id=NN`), detects vehicles with an
 AI model on [Replicate](https://replicate.com), and marks curb space as **occupied (red)** or
 **available (green)**. It alerts you when a space opens.
@@ -76,7 +77,7 @@ Where the key goes:
 - It is stored **only in your browser** (`localStorage`). Browser storage is not encrypted:
   anyone with access to the browser profile, or a malicious script on the site, could read
   it. **Data → Export** does not include it.
-- It is sent **only to the Parking Vision API you are connected to**, over the live
+- It is sent **only to the FreePark API you are connected to**, over the live
   connection, and from there to Replicate. The API keeps it in memory while you watch,
   never writes it to disk or logs, and drops it once you stop watching.
 - A camera is analysed only while you have it open and only when its source publishes a new
@@ -140,7 +141,7 @@ other people:
   hosts on standard ports, checks that the address is public, doesn't follow redirects and
   caps images at 5 MB, but it still makes requests on your users' behalf.
 - **Nothing to back up.** User data lives in browsers; the API's `DATA_DIR` only holds
-  temporary frames (`/tmp/parking-vision` in Docker).
+  temporary frames (`/tmp/freepark` in Docker).
 
 ## Camera data
 

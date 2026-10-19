@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 CACHE_SECONDS = 6 * 60 * 60
 MAX_LISTING_BYTES = 8 * 1024 * 1024
-USER_AGENT = "parking-vision/0.1 (+self-hosted street parking monitor)"
+USER_AGENT = "FreePark/0.1 (+https://getfreepark.com)"
 
 
 class CatalogError(Exception):

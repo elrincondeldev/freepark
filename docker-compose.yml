@@ -5,7 +5,7 @@ services:
     build: ./apps/api
     restart: unless-stopped
     environment:
-      DATA_DIR: /tmp/parking-vision
+      DATA_DIR: /tmp/freepark
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
       FRAME_RETENTION: ${FRAME_RETENTION:-20}

@@ -1,4 +1,4 @@
-# Parking Vision API
+# FreePark API
 
 FastAPI service that watches public JPEG cameras, including Vigo's
 (`https://camaras.vigo.org/webcam/cam.php?id=NN`),
@@ -14,7 +14,7 @@ uv run ruff check .
 
 The browser owns durable views, zones and exemplar images. It sends a snapshot to the API
 when opened or reconnected. The API keeps one isolated in-memory session per browser id;
-`DATA_DIR` holds temporary frames and session images (default `./data`, `/tmp/parking-vision`
+`DATA_DIR` holds temporary frames and session images (default `./data`, `/tmp/freepark`
 in Docker). Restarting the API requires an open browser to reconnect and restore its data.
 Run one API worker per instance: active analysis sessions live in process memory. Separate
 workers need sticky routing to keep a browser on the same worker.

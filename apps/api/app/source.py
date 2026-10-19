@@ -15,7 +15,7 @@ import httpx
 
 from app.camera_ids import InvalidCameraId, custom_camera_id, normalize_source_url
 
-USER_AGENT = "parking-vision/0.1 (+self-hosted street parking monitor)"
+USER_AGENT = "FreePark/0.1 (+https://getfreepark.com)"
 JPEG_SOI = b"\xff\xd8"
 MAX_FRAME_BYTES = 5 * 1024 * 1024
 

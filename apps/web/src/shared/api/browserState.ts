@@ -1,5 +1,6 @@
 /** Durable browser copy of the user's views, zones, samples and reference images. */
 
+// Storage keys keep the project's original name so existing browsers keep their data.
 const CLIENT_KEY = 'parking-vision-client-id'
 const STATE_KEY = 'parking-vision-state-v1'
 const DB_NAME = 'parking-vision-images'
@@ -234,7 +235,7 @@ export async function exportBrowserSnapshot(watchlist?: unknown): Promise<void> 
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = 'parking-vision-data.json'
+  link.download = 'freepark-data.json'
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
