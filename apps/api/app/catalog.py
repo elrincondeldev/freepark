@@ -23,12 +23,24 @@ from app.camera_ids import InvalidCameraId, normalize_camera_id, normalize_sourc
 log = logging.getLogger(__name__)
 
 CACHE_SECONDS = 6 * 60 * 60
+# How long one sample image may take when checking that a city's cameras can be fetched.
+REACH_TIMEOUT = 5.0
+REACH_SAMPLES = 3
 MAX_LISTING_BYTES = 8 * 1024 * 1024
 USER_AGENT = "FreePark/0.1 (+https://getfreepark.com)"
 
 
 class CatalogError(Exception):
     """A city's camera listing could not be loaded."""
+
+
+@dataclass(frozen=True)
+class Listing:
+    cameras: list[CatalogCamera]
+    # False when none of the sample images could be fetched from this server: some
+    # publishers only accept connections from certain networks. Logged as a warning so
+    # whoever runs the server knows those cameras will fail to add.
+    reachable: bool
 
 
 @dataclass(frozen=True)
@@ -265,10 +277,13 @@ class CameraCatalog:
         self._timeout = timeout
         self._clock = clock
         self.cities = {city.id: city for city in cities}
-        self._cache: dict[str, tuple[float, list[CatalogCamera]]] = {}
+        self._cache: dict[str, tuple[float, Listing]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 
     async def cameras(self, city_id: str) -> list[CatalogCamera]:
+        return (await self.listing(city_id)).cameras
+
+    async def listing(self, city_id: str) -> Listing:
         city = self.cities[city_id]
         cached = self._cache.get(city_id)
         if cached and cached[0] > self._clock():
@@ -283,8 +298,32 @@ class CameraCatalog:
                 if cached:  # serve the stale listing rather than nothing
                     return cached[1]
                 raise
-            self._cache[city_id] = (self._clock() + CACHE_SECONDS, cameras)
-            return cameras
+            listing = Listing(cameras, await self._reachable(city, cameras))
+            self._cache[city_id] = (self._clock() + CACHE_SECONDS, listing)
+            return listing
+
+    async def _reachable(self, city: City, cameras: list[CatalogCamera]) -> bool:
+        """True when at least one of a few sample images downloads from this server."""
+        step = max(1, len(cameras) // REACH_SAMPLES)
+        samples = cameras[::step][:REACH_SAMPLES]
+
+        async def fetches(camera: CatalogCamera) -> bool:
+            try:
+                response = await self._http.get(
+                    camera.preview_url, headers={"User-Agent": USER_AGENT}, timeout=REACH_TIMEOUT
+                )
+            except httpx.HTTPError:
+                return False
+            return response.status_code == 200 and response.content.startswith(b"\xff\xd8")
+
+        reachable = any(await asyncio.gather(*(fetches(c) for c in samples)))
+        if not reachable:
+            log.warning(
+                "camera images for %s can't be fetched from this server; its publisher may"
+                " block this server's network",
+                city.id,
+            )
+        return reachable
 
     async def _load(self, city: City) -> list[CatalogCamera]:
         try:

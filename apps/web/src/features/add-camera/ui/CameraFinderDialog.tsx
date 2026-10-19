@@ -501,7 +501,7 @@ function Results({
     } catch {
       setErrors((s) => ({
         ...s,
-        [camera.id]: "This camera isn't sending images right now. Try a nearby one.",
+        [camera.id]: "FreePark couldn't get an image from this camera right now. Try a nearby one.",
       }))
     } finally {
       setAdding((s) => without(s, camera.id))

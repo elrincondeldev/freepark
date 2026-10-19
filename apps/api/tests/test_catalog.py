@@ -15,6 +15,8 @@ from app.catalog import (
 )
 
 VIGO_URL = "https://datos.vigo.org/data/trafico/camaras-trafico.json"
+VIGO_IMAGES = r"https://cams\.test/cam\.php\?id=\d+"
+JPEG = b"\xff\xd8\xff\xe0" + b"img" * 20
 VIGO = [
     {"id": "5", "nombre": "Castelao - Grove", "lat": 42.21836, "lon": -8.74407},
     {"id": "24", "nombre": "Policarpo Sanz - Reconquista", "lat": 42.23753, "lon": -8.72315},
@@ -112,6 +114,7 @@ def test_lists_supported_cities(client):
 @respx.mock
 def test_city_cameras_are_loaded_once_and_cached(client):
     route = respx.get(VIGO_URL).respond(200, json=VIGO)
+    images = respx.get(url__regex=VIGO_IMAGES).respond(200, content=JPEG)
     first = client.get("/api/catalog/cities/vigo/cameras")
     assert first.status_code == 200
     body = first.json()
@@ -122,6 +125,28 @@ def test_city_cameras_are_loaded_once_and_cached(client):
     }
     assert client.get("/api/catalog/cities/vigo/cameras").json() == body
     assert route.call_count == 1
+    assert images.call_count == 2  # both sample cameras checked once, then cached
+
+
+@respx.mock
+def test_city_whose_images_this_server_cannot_fetch_is_logged_but_still_listed(client, caplog):
+    respx.get(VIGO_URL).respond(200, json=VIGO)
+    respx.get(url__regex=VIGO_IMAGES).mock(side_effect=httpx.ConnectTimeout("blocked"))
+    with caplog.at_level("WARNING", logger="app.catalog"):
+        body = client.get("/api/catalog/cities/vigo/cameras").json()
+    assert len(body["cameras"]) == 2
+    assert "camera images for vigo can't be fetched from this server" in caplog.text
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_one_working_sample_is_enough():
+    respx.get(VIGO_URL).respond(200, json=VIGO)
+    respx.get("https://cams.test/cam.php?id=05").respond(404)
+    respx.get("https://cams.test/cam.php?id=24").respond(200, content=JPEG)
+    async with httpx.AsyncClient() as http:
+        catalog = CameraCatalog(http, "https://cams.test/cam.php?id={id}")
+        assert (await catalog.listing("vigo")).reachable is True
 
 
 def test_unknown_city_is_404(client):
@@ -141,8 +166,9 @@ def test_unreachable_listing_is_502(client):
 async def test_stale_listing_is_served_when_refresh_fails():
     now = [0.0]
     route = respx.get(VIGO_URL).respond(200, json=VIGO)
+    respx.get(url__regex=r"https://cams\.test/.*").respond(200, content=JPEG)
     async with httpx.AsyncClient() as http:
-        catalog = CameraCatalog(http, "x{id}", clock=lambda: now[0])
+        catalog = CameraCatalog(http, "https://cams.test/{id}.jpg", clock=lambda: now[0])
         fresh = await catalog.cameras("vigo")
         now[0] = 10 * 24 * 3600
         route.respond(500)

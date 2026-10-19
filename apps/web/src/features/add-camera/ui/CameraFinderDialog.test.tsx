@@ -168,7 +168,9 @@ test('a camera that does not respond explains itself and is not added', async ()
   api(() => new Response('{"detail":"down"}', { status: 502 }))
   const dialog = openFinder({ query: 'policarpo' })
   await userEvent.click(await within(dialog).findByRole('button', { name: 'Add Policarpo Sanz' }))
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent(/isn't sending images/)
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    /couldn't get an image from this camera/,
+  )
   expect(useCameraStore.getState().cameras).toEqual([])
 })
 

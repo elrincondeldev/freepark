@@ -43,8 +43,8 @@ export function addErrorMessage(err: unknown, input: string): string {
   const id = parseCameraInput(input)
   if (err instanceof ApiError && err.status === 502) {
     return id
-      ? `Camera ${id} could not be reached. Check its source and try again.`
-      : 'No usable JPEG image was found. Check that this is a direct, public image URL.'
+      ? `FreePark couldn't get an image from camera ${id}. Its server may be offline, or may not accept connections from FreePark right now.`
+      : "FreePark couldn't get a JPEG image from this link. Check that it's a direct, public image URL; some camera servers also refuse outside connections."
   }
   if (err instanceof ApiError && err.status === 400) return `Invalid camera source. ${FORMAT_HINT}`
   return 'Could not check the camera right now. Is the API running?'

@@ -79,7 +79,9 @@ test('reports an unreachable camera', async () => {
   mockFetch(502, { detail: 'camera 99 could not be reached: empty response' })
   render(<AddCamera />)
   await submit('99')
-  expect(await screen.findByRole('alert')).toHaveTextContent('Camera 99 could not be reached')
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    "FreePark couldn't get an image from camera 99",
+  )
   expect(useCameraStore.getState().cameras).toEqual([])
 })
 

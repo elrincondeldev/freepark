@@ -9,40 +9,57 @@ internet.
 browser ──https──▶ caddy :443 ──▶ web (nginx) ──/api, /ws──▶ api (FastAPI)
 ```
 
-This guide uses a [Hetzner Cloud](https://www.hetzner.com/cloud) server and a domain
-managed in Squarespace (`getfreepark.com`). Any Linux server with Docker works the same way.
+This guide uses a server in Spain from [Clouding.io](https://clouding.io) (Barcelona) and a
+domain managed in Squarespace (`getfreepark.com`). Any Linux server with Docker works the
+same way, **as long as it is in Spain** (see below).
 
-**Cost:** one small server, roughly €4–7 a month. There is no database and nothing to back
+**Cost:** one small server, roughly €5–7 a month. There is no database and nothing to back
 up: users' data lives in their browsers, and each user pays for AI analysis with their own
 Replicate key.
 
-## 1. Create the server (Hetzner)
+> **Why a server in Spain?** Some camera publishers only accept connections from Spanish IP
+> addresses. Vigo's and Málaga's camera servers refuse servers abroad (we tested from
+> Germany), while Madrid and the DGT accept them. From a server outside Spain, adding a Vigo
+> or Málaga camera fails with "FreePark couldn't get an image from this camera", and the API
+> logs `camera images for vigo can't be fetched from this server`.
 
-1. Sign up at [console.hetzner.cloud](https://console.hetzner.cloud) and create a project
-   (e.g. `freepark`).
-2. If you don't have an SSH key yet, create one on your computer and copy the public part:
+## 1. Create the server (in Spain)
+
+1. If you don't have an SSH key yet, create one on your computer and copy the public part:
 
    ```bash
    ssh-keygen -t ed25519 -C "freepark"
    ```
    ```bash
-   cat ~/.ssh/id_ed25519.pub
+   pbcopy < ~/.ssh/id_ed25519.pub
    ```
 
-3. **Add Server** with these options:
+   (`pbcopy` is macOS; elsewhere print it with `cat ~/.ssh/id_ed25519.pub`.)
+
+2. Sign up at [clouding.io](https://clouding.io), add your SSH key (paste the public key),
+   and create a server with:
 
    | Option | Choose |
    |---|---|
-   | Location | Nuremberg or Falkenstein (Germany), the closest to Spain |
+   | Location | Spain (Barcelona) |
    | Image | Ubuntu 24.04 |
-   | Type | Shared vCPU · x86 · **CX23** (2 vCPU, 4 GB), or the cheapest with at least 2 GB |
-   | Networking | Public IPv4 **on** (needed for most visitors) and IPv6 on |
-   | SSH keys | Paste the public key from step 2 |
-   | Firewalls | Create one allowing inbound **TCP 22, 80, 443** and **UDP 443** |
-   | Backups | Off (there is nothing to back up) |
+   | Size | **2 GB RAM**, 1–2 vCPU (the first build needs ~1.5 GB; the app itself uses far less) |
+   | Disk | the smallest offered (FreePark uses about 3 GB) |
+   | SSH key | the one from step 1 |
+   | Firewall | allow inbound **TCP 22, 80, 443** and **UDP 443** |
    | Name | `freepark` |
 
-4. Note the server's **IPv4** (and IPv6) address shown after it's created.
+3. Note the server's public **IPv4** address.
+
+4. **Check that the camera publishers accept this server** before going further. Log in
+   (`ssh root@YOUR_SERVER_IP`) and run:
+
+   ```bash
+   curl -s -o /dev/null -m 15 -w "vigo: %{http_code} %{size_download} bytes\n" "https://camaras.vigo.org/webcam/cam.php?id=09"; curl -s -o /dev/null -m 15 -w "malaga: %{http_code} %{size_download} bytes\n" "https://ctraficomovilidad.malaga.eu/recursos/movilidad/camaras_trafico/TV-87.jpg"
+   ```
+
+   Both lines should say `200` and thousands of bytes. `000 0 bytes` means that publisher
+   blocks this server: pick another provider in Spain.
 
 ## 2. Point the domain at the server (Squarespace)
 
@@ -132,7 +149,7 @@ Viewers reconnect automatically after the API restarts.
 ## Troubleshooting
 
 - **No certificate / browser warning:** the domain doesn't point at the server yet (check
-  `dig +short getfreepark.com`), or ports 80/443 are closed in the Hetzner firewall. Caddy
+  `dig +short getfreepark.com`), or ports 80/443 are closed in your provider's firewall. Caddy
   retries on its own once that's fixed. If you added an AAAA record, it must be the server's
   IPv6.
 - **502 Bad Gateway right after an update:** the API is still starting; wait a few seconds.
@@ -144,4 +161,4 @@ Viewers reconnect automatically after the API restarts.
 - The domain lives in one place: `DOMAIN` in `.env`. Share tags in
   `apps/web/index.html` also use `https://getfreepark.com`; change both if you use another
   domain.
-- To stop paying, delete the server in the Hetzner console (billing is hourly).
+- To stop paying, delete the server in your provider's console.
