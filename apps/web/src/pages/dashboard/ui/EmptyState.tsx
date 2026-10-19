@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { AddCameraForm } from '@/features/add-camera'
+import { AddCameraForm, FinderLauncher } from '@/features/add-camera'
 import { motionPresets } from '@/shared/ui'
 
 export function EmptyState() {
@@ -8,7 +8,7 @@ export function EmptyState() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={motionPresets.slow}
-      className="mx-auto flex max-w-xl flex-col items-center px-4 pt-[14vh] text-center"
+      className="mx-auto flex max-w-xl flex-col items-center px-4 pb-16 pt-[12vh] text-center"
     >
       <span className="mb-8 grid h-16 w-16 place-items-center rounded-2xl bg-free text-3xl font-bold text-white shadow-lg ring-8 ring-free/15">
         P
@@ -17,17 +17,22 @@ export function EmptyState() {
         Find a free spot before you get there
       </h1>
       <p className="mt-3 max-w-md text-muted">
-        Add the Vigo traffic cameras that cover your streets. We watch them live and mark free curb
-        space in green.
+        Pick a live street camera where you want to park. We watch it and mark free curb space in
+        green.
       </p>
-      <div className="mt-8 flex w-full justify-center">
-        <AddCameraForm autoFocus large />
+      <div className="mt-8 w-full">
+        <FinderLauncher />
       </div>
-      <p className="mt-6 text-xs text-muted">
-        Try <code className="rounded bg-surface-2 px-1.5 py-0.5">47</code> or{' '}
-        <code className="rounded bg-surface-2 px-1.5 py-0.5">04</code>. Your list is saved in this
-        browser only.
-      </p>
+
+      <div className="mt-12 flex w-full max-w-lg items-center gap-3 text-xs text-muted">
+        <span className="h-px flex-1 bg-line" />
+        or paste a camera image link
+        <span className="h-px flex-1 bg-line" />
+      </div>
+      <div className="mt-4 flex w-full justify-center">
+        <AddCameraForm />
+      </div>
+      <p className="mt-6 text-xs text-muted">Your cameras are saved in this browser.</p>
     </motion.section>
   )
 }

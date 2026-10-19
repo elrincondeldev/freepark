@@ -1,35 +1,28 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import {
-  parseCameraInput,
-  probeCamera,
-  useCameraSelection,
-  useCameraStore,
-  type ProbeResult,
-} from '@/entities/camera'
-import { ApiError } from '@/shared/api'
+import { parseCameraInput, type ProbeResult } from '@/entities/camera'
+import { FORMAT_HINT, addCameraFromSource, addErrorMessage } from '../model/addCamera'
 
 type Status =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'error'; message: string }
-  | { kind: 'added'; probe: ProbeResult }
+  | { kind: 'added'; probe: ProbeResult; label: string }
 
-const FORMAT_HINT = 'Paste a camera link (…/cam.php?id=47) or type its number, like 04.'
-
+/** Add a camera by pasting its public JPEG link (or a Vigo camera number). */
 export function AddCameraForm({
   autoFocus = false,
   large = false,
+  onAdded,
 }: {
   autoFocus?: boolean
   large?: boolean
+  onAdded?: () => void
 }) {
   const [value, setValue] = useState('')
+  const [name, setName] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const inputRef = useRef<HTMLInputElement>(null)
-  const addCamera = useCameraStore((s) => s.addCamera)
-  const cameras = useCameraStore((s) => s.cameras)
-  const highlight = useCameraSelection((s) => s.highlight)
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus()
@@ -43,34 +36,35 @@ export function AddCameraForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const id = parseCameraInput(value)
-    if (!id) {
-      setStatus({ kind: 'error', message: `That doesn't look like a Vigo camera. ${FORMAT_HINT}` })
-      return
-    }
-    if (cameras.some((c) => c.id === id)) {
-      highlight(id)
-      setStatus({ kind: 'error', message: `You're already watching camera ${id}.` })
+    const input = value.trim()
+    const id = parseCameraInput(input)
+    if (!id && !/^https?:\/\//i.test(input)) {
+      setStatus({ kind: 'error', message: FORMAT_HINT })
       return
     }
     setStatus({ kind: 'checking' })
     try {
-      const probe = await probeCamera(value.trim())
-      if (addCamera(probe.cameraId) === 'duplicate') highlight(probe.cameraId)
-      setStatus({ kind: 'added', probe })
+      const outcome = await addCameraFromSource(input, name)
+      if (outcome.kind === 'duplicate') {
+        setStatus({
+          kind: 'error',
+          message: id
+            ? `You're already watching camera ${id}.`
+            : 'You are already watching this camera.',
+        })
+        return
+      }
+      setStatus({ kind: 'added', probe: outcome.probe, label: outcome.label })
       setValue('')
+      setName('')
+      onAdded?.()
     } catch (err) {
-      const message =
-        err instanceof ApiError && err.status === 502
-          ? `Camera ${id} could not be reached. Check the number and try again.`
-          : err instanceof ApiError && err.status === 400
-            ? `That doesn't look like a Vigo camera. ${FORMAT_HINT}`
-            : 'Could not check the camera right now. Is the API running?'
-      setStatus({ kind: 'error', message })
+      setStatus({ kind: 'error', message: addErrorMessage(err, input) })
     }
   }
 
   const checking = status.kind === 'checking'
+  const customUrl = !parseCameraInput(value) && /^https?:\/\//i.test(value.trim())
   return (
     <div className={large ? 'w-full max-w-lg' : 'w-full max-w-sm'}>
       <form onSubmit={submit} className="relative flex items-center" aria-label="Add camera">
@@ -81,7 +75,7 @@ export function AddCameraForm({
             setValue(e.target.value)
             if (status.kind === 'error') setStatus({ kind: 'idle' })
           }}
-          placeholder="Camera link or number…"
+          placeholder="Public JPEG link or Vigo number…"
           aria-label="Camera link or number"
           aria-invalid={status.kind === 'error'}
           aria-describedby="add-camera-status"
@@ -102,6 +96,16 @@ export function AddCameraForm({
           {checking ? 'Checking…' : 'Add'}
         </button>
       </form>
+      {customUrl && (
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          maxLength={80}
+          placeholder="Camera name (optional)"
+          aria-label="Camera name (optional)"
+          className="mt-2 h-9 w-full rounded-full border border-line bg-surface px-4 text-sm focus:border-accent focus:outline-none"
+        />
+      )}
       <div id="add-camera-status" aria-live="polite" className="min-h-0">
         <AnimatePresence mode="wait">
           {status.kind === 'error' && (
@@ -126,11 +130,11 @@ export function AddCameraForm({
             >
               <img
                 src={status.probe.url}
-                alt={`Preview of camera ${status.probe.cameraId}`}
+                alt={`Preview of ${status.label}`}
                 className="h-9 w-16 rounded-md object-cover"
               />
               <span>
-                Camera <strong className="text-ink">{status.probe.cameraId}</strong> added
+                <strong className="text-ink">{status.label}</strong> added
               </span>
             </motion.div>
           )}

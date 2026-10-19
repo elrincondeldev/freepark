@@ -1,4 +1,5 @@
 import { useCameraStore } from '@/entities/camera'
+import { CameraFinderDialog } from '@/features/add-camera'
 import { Toaster } from '@/shared/ui'
 import { AppHeader } from '@/widgets/app-header'
 import { CameraFocusLayer } from '@/widgets/camera-focus'
@@ -12,6 +13,7 @@ export function DashboardPage() {
       <AppHeader />
       {hasCameras ? <CameraGrid /> : <EmptyState />}
       <CameraFocusLayer />
+      <CameraFinderDialog />
       <Toaster />
     </div>
   )

@@ -36,7 +36,7 @@ test('adds a camera from a full URL and shows a preview', async () => {
   const fetch = mockFetch(200, probe('47'))
   render(<AddCamera />)
   await submit('https://camaras.vigo.org/webcam/cam.php?id=47')
-  expect(await screen.findByAltText('Preview of camera 47')).toBeInTheDocument()
+  expect(await screen.findByAltText('Preview of Camera 47')).toBeInTheDocument()
   expect(useCameraStore.getState().cameras.map((c) => c.id)).toEqual(['47'])
   expect(fetch.mock.calls[0][0]).toContain(
     encodeURIComponent('https://camaras.vigo.org/webcam/cam.php?id=47'),
@@ -51,11 +51,26 @@ test('adds a camera from a bare id', async () => {
   expect(useCameraStore.getState().cameras[0].id).toBe('04')
 })
 
+test('adds a public JPEG camera with its source and chosen name', async () => {
+  const sourceUrl = 'https://cameras.example.org/street/current.jpg'
+  const cameraId = `c_${'a'.repeat(24)}`
+  mockFetch(200, { ...probe(cameraId), sourceUrl })
+  render(<AddCamera />)
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('Camera link or number'), sourceUrl)
+  await user.type(screen.getByLabelText('Camera name (optional)'), 'My street')
+  await user.click(screen.getByRole('button', { name: 'Add' }))
+  expect(await screen.findByAltText('Preview of My street')).toBeInTheDocument()
+  expect(useCameraStore.getState().cameras).toEqual([
+    { id: cameraId, label: 'My street', notify: false, sourceUrl },
+  ])
+})
+
 test('rejects invalid input without calling the API', async () => {
   const fetch = mockFetch(200, {})
   render(<AddCamera />)
-  await submit('https://example.com/foo')
-  expect(screen.getByRole('alert')).toHaveTextContent(/doesn't look like a Vigo camera/)
+  await submit('not-a-camera')
+  expect(screen.getByRole('alert')).toHaveTextContent(/Paste a public JPEG image URL/)
   expect(fetch).not.toHaveBeenCalled()
   expect(useCameraStore.getState().cameras).toEqual([])
 })

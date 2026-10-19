@@ -18,7 +18,9 @@ export function DataControl() {
         })
       } else if (imported.watchlist === undefined) {
         for (const id of [...new Set(imported.cameraIds)].slice(0, 24)) {
-          if (normalizeCameraId(id) === id) useCameraStore.getState().addCamera(id)
+          if (/^\d{2,3}$/.test(id) && normalizeCameraId(id) === id) {
+            useCameraStore.getState().addCamera(id)
+          }
         }
       }
       window.location.reload()
@@ -82,6 +84,10 @@ function validWatchlist(
     if (
       typeof item.id !== 'string' ||
       normalizeCameraId(item.id) !== item.id ||
+      (item.id.startsWith('c_') &&
+        (typeof item.sourceUrl !== 'string' ||
+          !/^https?:\/\//.test(item.sourceUrl) ||
+          item.sourceUrl.length > 2048)) ||
       typeof item.label !== 'string' ||
       item.label.length > 80 ||
       typeof item.notify !== 'boolean' ||

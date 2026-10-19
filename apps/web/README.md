@@ -34,8 +34,9 @@ hooks, business rules), `api/` (requests), `lib/` (pure helpers).
 
 ### Entities
 
-- **camera**: the watched-camera list persisted in `localStorage` (`useCameraStore`),
-  which camera/panel is focused (`useCameraSelection`), id/URL parsing, `probeCamera`.
+- **camera**: the watched-camera list and public JPEG source URLs persisted in `localStorage`
+  (`useCameraStore`), which camera/panel is focused (`useCameraSelection`), id/URL parsing,
+  source registration and `probeCamera`.
 - **feed**: the live stream per camera. Server message types, `useFeedStore`, display
   status, `useDisplayedAnalysis` (keeps overlays tied to the frame on screen), and the UI
   to show it: `FeedViewport`, `ParkingOverlay`, `FreeSpacesChip`, `FeedStatusBadge`.

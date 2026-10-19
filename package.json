@@ -1,6 +1,7 @@
 {
   "name": "parking-vision",
   "private": true,
+  "license": "MIT",
   "workspaces": [
     "apps/web"
   ],

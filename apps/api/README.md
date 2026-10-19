@@ -1,6 +1,7 @@
 # Parking Vision API
 
-FastAPI service that watches Vigo traffic cameras (`https://camaras.vigo.org/webcam/cam.php?id=NN`)
+FastAPI service that watches public JPEG cameras, including Vigo's
+(`https://camaras.vigo.org/webcam/cam.php?id=NN`),
 while at least one client subscribes to them, detects new images, works out which stored
 viewpoint each frame shows, detects vehicles through Replicate and computes free curb space.
 
@@ -58,7 +59,10 @@ half-widths as a fraction of the image **width**, at the end of the line nearer 
 | Method & path | Body | Response |
 |---|---|---|
 | `GET /api/health` | – | `{"status": "ok"}` |
-| `GET /api/cameras/probe?input=<url or id>` | – | `200 {cameraId, frameId, capturedAt, url}`; `400` bad input; `502` camera unreachable / empty image |
+| `GET /api/catalog/cities` | – | `[{id, name, country, lat, lon, provider, scope}]` — camera directories: `scope: city` (Vigo, Madrid, Málaga street cameras) or `country` (DGT road cameras across Spain) |
+| `GET /api/catalog/cities/{city}/cameras` | – | `{city, cameras: [{id, name, lat, lon, input, previewUrl}]}` from the city's open-data listing, cached for 6 h; pass `input` to the probe endpoint to add a camera. `404` unknown city; `502` listing unavailable |
+| `GET /api/cameras/probe?input=<url or id>` | `X-Client-Id` for custom URLs | `200 {cameraId, frameId, capturedAt, url, sourceUrl?}`; `400` bad input; `502` unusable image |
+| `POST /api/cameras/sources` | `X-Client-Id` and `{sources: {cameraId: sourceUrl}}` | Restores public camera URLs into this browser's temporary session; at most 24 per call |
 | `GET /api/cameras/{id}/probe` | – | same as above for a bare id (`4` → `04`) |
 | `GET /api/cameras/{id}/frames/{frameId}.jpg` | – | JPEG, `Cache-Control: immutable`; `404` when pruned |
 | `POST /api/cameras/{id}/reanalyze?fresh=` | `Replicate-Api-Key` header (optional) | Re-runs analysis of the camera's latest image using the caller's key. Watched camera with the same key: `202 {queued: true}`, result follows over the WebSocket; `fresh=true` forces a new prediction. An unwatched camera is analysed right away without retaining per-user state: `200 {queued: false, analysis}` (a new prediction). `502` if no image can be obtained |
@@ -82,6 +86,12 @@ half-widths as a fraction of the image **width**, at the end of the line nearer 
 Browser-specific view and zone requests include `X-Client-Id`. Creating, editing or deleting
 views and zones re-analyses the camera's latest frame (reusing its
 detections, so no extra prediction).
+
+Custom camera IDs are stable hashes of normalized source URLs. Source URLs must be public
+HTTP(S) hostnames on standard ports, return a decodable JPEG of at most 5 MB and 4096 pixels
+on either side, and cannot redirect. The API resolves and pins only public IP addresses for
+each request. Browsers keep URLs locally and re-register them after reconnecting; the API
+does not persist them.
 
 ## WebSocket `/ws`
 

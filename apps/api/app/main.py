@@ -11,6 +11,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.catalog import CameraCatalog
 from app.config import Settings, get_settings
 from app.detection import build_detector
 from app.frames import FrameStore
@@ -18,6 +19,7 @@ from app.monitor import CameraMonitor, CameraState, Emit, MonitorConfig, WatchMa
 from app.pipeline import Analyzer
 from app.repository import Repository
 from app.routes_cameras import router as cameras_router
+from app.routes_catalog import router as catalog_router
 from app.routes_state import router as state_router
 from app.routes_views import router as views_router
 from app.routes_zones import router as zones_router
@@ -30,7 +32,9 @@ from app.ws import router as ws_router
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
-def build_services(settings: Settings, http: httpx.AsyncClient) -> Services:
+def build_services(
+    settings: Settings, http: httpx.AsyncClient, public_http: httpx.AsyncClient
+) -> Services:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     # Old session images are disposable; browsers restore references on reconnect.
     shutil.rmtree(settings.data_dir / "sessions", ignore_errors=True)
@@ -39,7 +43,9 @@ def build_services(settings: Settings, http: httpx.AsyncClient) -> Services:
     store = FrameStore(
         settings.data_dir / "sessions" / "legacy", settings.frame_retention, shared_frames
     )
-    fetcher = SourceFetcher(http, settings.source_url_template, settings.fetch_timeout_seconds)
+    fetcher = SourceFetcher(
+        http, settings.source_url_template, settings.fetch_timeout_seconds, public_http
+    )
     config = MonitorConfig(
         poll_interval=settings.poll_interval_seconds,
         max_backoff=settings.max_backoff_seconds,
@@ -82,7 +88,11 @@ def build_services(settings: Settings, http: httpx.AsyncClient) -> Services:
                 )
                 sessions[client_id] = Services(
                     settings=settings, http=http, repo=session_repo, store=session_store,
-                    fetcher=fetcher, manager=root.manager, views=session_views,
+                    fetcher=SourceFetcher(
+                        http, settings.source_url_template, settings.fetch_timeout_seconds,
+                        public_http,
+                    ),
+                    manager=root.manager, views=session_views,
                     analyzer_for=lambda token, r=session_repo, v=session_views: Analyzer(
                         settings, r, v, build_detector(settings, token, prediction_slots)
                     ),
@@ -97,7 +107,7 @@ def build_services(settings: Settings, http: httpx.AsyncClient) -> Services:
         session = session_for(client_id)
         analyzer = session.analyzer_for(token)
         return CameraMonitor(
-            camera_id, fetcher, session.store, analyzer, emit, state, config,
+            camera_id, session.fetcher, session.store, analyzer, emit, state, config,
             analyzer.forget_detections
         )
 
@@ -135,9 +145,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        async with httpx.AsyncClient(follow_redirects=True) as http:
-            services = build_services(settings, http)
+        async with (
+            httpx.AsyncClient(follow_redirects=True) as http,
+            httpx.AsyncClient(
+                follow_redirects=False,
+                trust_env=False,
+                limits=httpx.Limits(max_keepalive_connections=0),
+            ) as public_http,
+        ):
+            services = build_services(settings, http, public_http)
             app.state.services = services
+            app.state.catalog = CameraCatalog(http, settings.source_url_template)
             try:
                 yield
             finally:
@@ -156,6 +174,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(cameras_router)
+    app.include_router(catalog_router)
     app.include_router(state_router)
     app.include_router(views_router)
     app.include_router(zones_router)

@@ -1,7 +1,8 @@
 [project]
 name = "parking-vision-api"
 version = "0.1.0"
-description = "Street parking availability from Vigo public traffic cameras"
+description = "Street parking availability from public JPEG traffic cameras"
+license = "MIT"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "fastapi>=0.115",

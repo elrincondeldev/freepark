@@ -46,6 +46,20 @@ test('persists and restores cameras, labels, order and notification flags', asyn
   expect(b.getState().storageAvailable).toBe(true)
 })
 
+test('persists a custom camera source across reloads', async () => {
+  const storage = memoryStorage()
+  const cameraId = `c_${'a'.repeat(24)}`
+  const sourceUrl = 'https://cameras.example.org/street/current.jpg'
+  createCameraStore(() => storage)
+    .getState()
+    .addCamera(cameraId, 'My street', sourceUrl)
+  const restored = createCameraStore(() => storage)
+  await restored.persist.rehydrate()
+  expect(restored.getState().cameras).toEqual([
+    { id: cameraId, label: 'My street', notify: false, sourceUrl },
+  ])
+})
+
 test('remove deletes from storage', () => {
   const storage = memoryStorage()
   const store = createCameraStore(() => storage)

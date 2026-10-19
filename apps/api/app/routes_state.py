@@ -30,7 +30,7 @@ class SnapshotRecord(BaseModel):
 
 class StoredView(SnapshotRecord):
     id: int = Field(gt=0)
-    camera_id: str = Field(min_length=1, max_length=3)
+    camera_id: str = Field(min_length=1, max_length=26)
     name: str = Field(min_length=1, max_length=80)
     created_at: str = Field(min_length=1, max_length=64)
 

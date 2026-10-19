@@ -1,4 +1,4 @@
-export { probeCamera, type ProbeResult } from './api/probeCamera'
+export { probeCamera, registerCameraSources, type ProbeResult } from './api/probeCamera'
 export { normalizeCameraId, parseCameraInput } from './lib/cameraId'
 export { useCameraSelection, type CameraPanel } from './model/selection'
 export type { Settings, WatchedCamera } from './model/types'

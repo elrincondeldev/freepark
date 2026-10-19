@@ -8,7 +8,7 @@ interface CameraState {
   cameras: WatchedCamera[]
   settings: Settings
   storageAvailable: boolean
-  addCamera: (id: string, label?: string) => 'added' | 'duplicate'
+  addCamera: (id: string, label?: string, sourceUrl?: string) => 'added' | 'duplicate'
   removeCamera: (id: string) => void
   renameCamera: (id: string, label: string) => void
   moveCamera: (id: string, toIndex: number) => void
@@ -27,12 +27,17 @@ export function createCameraStore(getStorage?: () => Storage | undefined) {
         cameras: [],
         settings: { sound: false },
         storageAvailable: available,
-        addCamera: (id, label) => {
+        addCamera: (id, label, sourceUrl) => {
           if (get().cameras.some((c) => c.id === id)) return 'duplicate'
           set((s) => ({
             cameras: [
               ...s.cameras,
-              { id, label: label?.trim() || defaultLabel(id), notify: false },
+              {
+                id,
+                label: label?.trim() || defaultLabel(id),
+                notify: false,
+                ...(sourceUrl ? { sourceUrl } : {}),
+              },
             ],
           }))
           return 'added'

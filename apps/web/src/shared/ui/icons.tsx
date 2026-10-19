@@ -69,3 +69,36 @@ export const ArrowLeftIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M19 12H5M12 19l-7-7 7-7" />
   </svg>
 )
+export const PlusIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+export const CheckIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="M20 6 9 17l-5-5" />
+  </svg>
+)
+export const SearchIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </svg>
+)
+export const LocateIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21Z" />
+    <circle cx="12" cy="9.5" r="2.5" />
+  </svg>
+)
+export const CameraIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </svg>
+)
+export const StarIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9Z" />
+  </svg>
+)

@@ -66,3 +66,27 @@ test('changing the key reconnects the live camera with the new key', async () =>
   expect(JSON.parse(second.sent[0]).replicateApiKey).toBe('key-b')
   unmount()
 })
+
+test('restores a public camera source before subscribing after reconnect', async () => {
+  vi.stubGlobal('WebSocket', MockSocket)
+  const fetch = vi.fn().mockResolvedValue(new Response('{"registered":1}', { status: 200 }))
+  vi.stubGlobal('fetch', fetch)
+  const cameraId = `c_${'a'.repeat(24)}`
+  const sourceUrl = 'https://cameras.example.org/street/current.jpg'
+  useCameraStore.setState({
+    cameras: [{ id: cameraId, label: 'My street', notify: false, sourceUrl }],
+  })
+  const { unmount } = renderHook(() => useLiveUpdates('ws://test/ws'))
+  const socket = MockSocket.instances[0]
+  act(() => socket.open())
+  await waitFor(() => expect(socket.sent).toHaveLength(1))
+  expect(fetch).toHaveBeenCalledWith(
+    '/api/cameras/sources',
+    expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ sources: { [cameraId]: sourceUrl } }),
+    }),
+  )
+  expect(JSON.parse(socket.sent[0]).cameras).toEqual([cameraId])
+  unmount()
+})

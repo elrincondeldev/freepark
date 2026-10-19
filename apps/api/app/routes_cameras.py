@@ -6,17 +6,23 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
-from app.camera_ids import InvalidCameraId, normalize_camera_id, parse_camera_input
+from app.camera_ids import InvalidCameraId, normalize_camera_id, parse_camera_source
 from app.frames import make_frame_id
 from app.monitor import FrameInfo
 from app.services import Services, get_services
 from app.source import FetchError
+from app.view_registry import decode_gray
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])
 Svc = Annotated[Services, Depends(get_services)]
 
 IMMUTABLE = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+
+class SourceRegistration(BaseModel):
+    sources: dict[str, str] = Field(max_length=24)
 
 
 def _camera_id(raw: str) -> str:
@@ -31,6 +37,13 @@ async def _probe(svc: Services, camera_id: str) -> dict:
         fetched = await svc.fetcher.fetch(camera_id)
     except FetchError as exc:
         raise HTTPException(502, f"camera {camera_id} could not be reached: {exc}") from exc
+    if camera_id.startswith("c_"):
+        try:
+            image = decode_gray(fetched.data)
+        except ValueError as exc:
+            raise HTTPException(502, "camera did not return a decodable JPEG") from exc
+        if max(image.shape) > 4096:
+            raise HTTPException(502, "camera image exceeds 4096-pixel dimension limit")
     frame_id = make_frame_id(fetched.captured_epoch, fetched.data)
     await asyncio.to_thread(svc.store.save, camera_id, frame_id, fetched.data)
     return {
@@ -42,13 +55,31 @@ async def _probe(svc: Services, camera_id: str) -> dict:
 
 
 @router.get("/probe")
-async def probe_input(svc: Svc, input: Annotated[str, Query(min_length=1, max_length=300)]):
-    """Resolve a pasted URL or id, then check that the camera returns an image."""
+async def probe_input(svc: Svc, input: Annotated[str, Query(min_length=1, max_length=2048)]):
+    """Resolve Vigo shorthand or a public JPEG URL and check its current image."""
     try:
-        camera_id = parse_camera_input(input)
+        camera_id, source_url = parse_camera_source(input)
+        if source_url:
+            if not svc.client_id:
+                raise HTTPException(400, "client id required for custom cameras")
+            svc.fetcher.register_source(camera_id, source_url)
     except InvalidCameraId as exc:
         raise HTTPException(400, str(exc)) from exc
-    return await _probe(svc, camera_id)
+    result = await _probe(svc, camera_id)
+    if source_url:
+        result["sourceUrl"] = source_url
+    return result
+
+
+@router.post("/sources")
+def register_sources(body: SourceRegistration, svc: Svc) -> dict[str, int]:
+    if not svc.client_id:
+        raise HTTPException(400, "client id required for custom cameras")
+    try:
+        svc.fetcher.set_sources(body.sources)
+    except InvalidCameraId as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"registered": len(body.sources)}
 
 
 @router.get("/{camera_id}/probe")

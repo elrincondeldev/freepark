@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useCameraStore } from '@/entities/camera'
+import { registerCameraSources, useCameraStore } from '@/entities/camera'
 import { subscribeMessage, useFeedStore, type ServerMessage } from '@/entities/feed'
 import { useReplicateKeyStore } from '@/entities/replicate-key'
 import { browserClientId, restoreBrowserState, saveBrowserStateSoon } from '@/shared/api'
@@ -16,7 +16,10 @@ export function useLiveUpdates(url?: string) {
     feed.clearAnalyses()
     const client = new WsClient<ServerMessage>({
       url: url ?? defaultWsUrl(),
-      beforeSubscribe: restoreBrowserState,
+      beforeSubscribe: async () => {
+        await restoreBrowserState()
+        await registerCameraSources(useCameraStore.getState().cameras)
+      },
       subscribeMessage: (cameras) => subscribeMessage(cameras, replicateApiKey, browserClientId()),
       onMessage: (msg) => {
         useFeedStore.getState().handle(msg)
