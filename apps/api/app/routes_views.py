@@ -7,8 +7,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.camera_ids import InvalidCameraId, normalize_camera_id
-from app.db import View
-from app.services import Services, get_services
+from app.repository import View
+from app.services import Services, get_services, validate_client_id
 
 router = APIRouter(prefix="/api", tags=["views"])
 Svc = Annotated[Services, Depends(get_services)]
@@ -56,7 +56,10 @@ def view_out(svc: Services, view: View) -> dict:
         "cameraId": view.camera_id,
         "name": view.name,
         "createdAt": view.created_at,
-        "referenceUrl": f"/api/views/{view.id}/reference.jpg?v={ref.id}" if ref else None,
+        "referenceUrl": (
+            f"/api/views/{view.id}/reference.jpg?v={ref.id}&clientId={svc.client_id}"
+            if ref else None
+        ),
         "exemplarCount": len(exemplars),
         "zoneCount": len(svc.repo.list_zones(view.id)),
     }
@@ -99,7 +102,9 @@ def recapture_reference(view_id: int, body: ReferenceUpdate, svc: Svc):
 
 
 @router.get("/views/{view_id}/reference.jpg")
-def reference_image(view_id: int, svc: Svc):
+def reference_image(view_id: int, svc: Svc, clientId: str = ""):
+    if clientId and svc.session_for:
+        svc = svc.session_for(validate_client_id(clientId))
     _view_or_404(svc, view_id)
     path = svc.views.reference_path(view_id)
     if path is None or not path.is_file():

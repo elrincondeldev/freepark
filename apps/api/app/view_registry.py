@@ -7,9 +7,9 @@ import threading
 import cv2
 import numpy as np
 
-from app.db import Repository, View
 from app.frames import FrameStore
 from app.quality import Mask, brightness
+from app.repository import Repository, View
 from app.views import (
     CachedExemplar,
     Features,

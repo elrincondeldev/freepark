@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { useCameraStore } from '@/entities/camera'
 import { useFeedStore } from '@/entities/feed'
 import { useReplicateKeyStore } from '@/entities/replicate-key'
@@ -42,23 +42,27 @@ afterEach(() => {
   MockSocket.instances = []
 })
 
-test('changing the key reconnects the live camera with the new key', () => {
+test('changing the key reconnects the live camera with the new key', async () => {
   vi.stubGlobal('WebSocket', MockSocket)
   useCameraStore.setState({ cameras: [{ id: '47', label: 'Camera 47', notify: false }] })
   useReplicateKeyStore.getState().setKey('key-a')
   const { unmount } = renderHook(() => useLiveUpdates('ws://test/ws'))
   const first = MockSocket.instances[0]
   act(() => first.open())
-  expect(JSON.parse(first.sent[0])).toEqual({
-    type: 'subscribe',
-    cameras: ['47'],
-    replicateApiKey: 'key-a',
-  })
+  await waitFor(() => expect(first.sent).toHaveLength(1))
+  expect(JSON.parse(first.sent[0])).toEqual(
+    expect.objectContaining({
+      type: 'subscribe',
+      cameras: ['47'],
+      replicateApiKey: 'key-a',
+    }),
+  )
 
   act(() => useReplicateKeyStore.getState().setKey('key-b'))
   expect(first.closed).toBe(true)
   const second = MockSocket.instances[1]
   act(() => second.open())
+  await waitFor(() => expect(second.sent).toHaveLength(1))
   expect(JSON.parse(second.sent[0]).replicateApiKey).toBe('key-b')
   unmount()
 })

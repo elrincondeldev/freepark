@@ -1,3 +1,5 @@
+import { browserClientId } from './browserState'
+
 export class ApiError extends Error {
   readonly status: number
   constructor(status: number, message: string) {
@@ -10,7 +12,11 @@ export class ApiError extends Error {
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(path, {
     ...init,
-    headers: init?.body ? { 'Content-Type': 'application/json', ...init?.headers } : init?.headers,
+    headers: {
+      'X-Client-Id': browserClientId(),
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
   })
   if (!resp.ok) {
     let message = resp.statusText

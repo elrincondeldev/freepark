@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from app.db import Zone
 from app.detection import Detection
 from app.geometry import Polyline, complement, merge_intervals
+from app.repository import Zone
 from app.views import apply_homography
 
 CAR_LENGTH_PER_BAND = 2.2  # car length ≈ 2.2 × car width, band ≈ half car width

@@ -4,7 +4,6 @@ import cv2
 import pytest
 
 from app.config import Settings
-from app.db import Repository
 from app.detection import (
     Detection,
     DetectionUnavailable,
@@ -13,6 +12,7 @@ from app.detection import (
 from app.frames import FrameStore, make_frame_id
 from app.monitor import FrameInfo
 from app.pipeline import Analyzer
+from app.repository import Repository
 from app.view_registry import ViewRegistry
 from app.views import ViewMatcher
 from tests.fixtures import frame_bytes, to_jpeg
@@ -42,7 +42,7 @@ class ScriptedDetector:
 @pytest.fixture
 def env(tmp_path):
     settings = Settings(_env_file=None, data_dir=tmp_path, available_confirm_frames=1)
-    repo = Repository(tmp_path / "p.db")
+    repo = Repository()
     store = FrameStore(tmp_path, 20)
     views = ViewRegistry(repo, store, ViewMatcher(), settings.view_mask)
     view = views.create_view("47", "Avenue", frame_bytes("47_1791962972.jpg"))

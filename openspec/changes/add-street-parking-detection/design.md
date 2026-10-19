@@ -14,7 +14,7 @@ See proposal.md for motivation and specs/ for the behaviour contract. This secti
 - Curb parking is unmarked; cameras are PTZ and rotate between viewpoints (cam 04 looks down a street with a crossing, cam 47 along a long avenue with parking on both curbs).
 - The traffic index page (`hoxe.vigo.org/conecenos/trafico.php`) contains no static `cam.php?id=` references; the catalogue is not scraped (out of scope).
 
-**User decisions**: zones are loose curb lines, not exact bays; notifications are in-app + browser Notification API; analysis runs only while a camera is watched; persistence is SQLite.
+**User decisions**: zones are loose curb lines, not exact bays; notifications are in-app + browser Notification API; analysis runs only while a camera is watched; durable user data is held in the browser.
 
 ## Goals / Non-Goals
 
@@ -37,7 +37,7 @@ apps/web/   Vite + React 18 + TypeScript + Tailwind + Framer Motion + Zustand
 apps/api/   Python 3.12 + FastAPI + uvicorn, deps managed with uv (pyproject.toml + uv.lock)
 docker-compose.yml, apps/*/Dockerfile, root package.json (npm workspaces: apps/web)
 ```
-Root `package.json` scripts: `dev` → web dev server (5173, proxies `/api` and `/ws` to `localhost:4000`), `dev:api` → uvicorn with reload. Compose services: `api` (port `${API_PORT:-4000}`, volume `api-data:/data`) and `web` (multi-stage: build with Node, serve with nginx, reverse-proxy `/api` and `/ws` to `api`, so the browser uses one origin). `.dockerignore` is rewritten per app context.
+Root `package.json` scripts: `dev` → web dev server (5173, proxies `/api` and `/ws` to `localhost:4000`), `dev:api` → uvicorn with reload. Compose services: `api` (port `${API_PORT:-4000}`, temporary files only) and `web` (multi-stage: build with Node, serve with nginx, reverse-proxy `/api` and `/ws` to `api`, so the browser uses one origin). `.dockerignore` is rewritten per app context.
 *Alternatives*: Turborepo/Nx — unnecessary for two apps in two languages; Poetry — uv is faster and simpler in Docker.
 
 ### D2. Real-time transport: one WebSocket per client + HTTP for images
@@ -102,9 +102,8 @@ Per frame (after warping zone geometry with the view homography):
 ### D8. Temporal smoothing (hysteresis)
 Each zone's arc is discretised into 200 bins. A bin is published as available only if it was free in the last `AVAILABLE_CONFIRM_FRAMES` (default 2) consecutive analysed frames **of the same view**; occupancy is published immediately. History is kept per zone (each zone belongs to one view), so frames of *other* views, unknown views or low-quality frames in between do not break the streak — the live check showed Vigo cameras switching viewpoint every one or two images, and resetting on every rotation meant a space was almost never confirmed. History expires when a view has not been seen for 5 minutes, and restarts when the zone is edited. With a ~70 s source cadence this delays "available" by one update of that view — accepted to avoid false alerts.
 
-### D9. Persistence: SQLite + frames on disk
-`/data/parking.db` (plain `sqlite3` via a small repository module run in a thread pool; schema versioned with a `schema_version` table and ordered SQL migrations). Tables: `views(id, camera_id, name, created_at)`, `view_exemplars(id, view_id, frame_path, is_reference, brightness, ref_homography)`, `zones(id, view_id, name, points_json, band_near, band_far, min_gap_cars, updated_at)`, `zone_length_samples(zone_id, s, length, observed_at)` (capped per zone). Frames: `/data/frames/{cameraId}/{frameId}.jpg`, `frameId = <lastModifiedEpoch>-<hash8>`; pruning keeps the newest `FRAME_RETENTION` (20). Exemplar images are copied to `/data/exemplars/{viewId}/`, so pruning can never remove a view's reference. The camera *list* is never stored server-side (it lives in each browser's `localStorage`).
-*Alternative*: Postgres (as in current `.env.example`) — an extra service for a few small tables; dropped per user decision.
+### D9. Persistence: browser snapshot + temporary server session
+Camera lists, view and zone metadata, and learned spacing samples live in browser `localStorage`; exemplar JPEGs live in IndexedDB. The browser restores its snapshot to an isolated in-memory API session on startup and WebSocket reconnect, and saves changes after edits and analyses. Users can export or import the complete view/zone snapshot as JSON. API frame and exemplar files are temporary: frames are kept under `DATA_DIR/frames/{cameraId}/{frameId}.jpg` with the newest `FRAME_RETENTION` (20), and session exemplars under `DATA_DIR/sessions/{clientId}/exemplars/`. Idle sessions are removed after a five-minute reconnect grace period. The API has no durable user database. A deployment using multiple API workers needs sticky routing.
 
 REST surface (all JSON unless noted): `GET /api/health`; `GET /api/cameras/probe?input=<url or id>` and `GET /api/cameras/{id}/probe`; `GET /api/cameras/{id}/frames/{frameId}.jpg`; `GET|POST /api/cameras/{id}/views`; `PATCH|DELETE /api/views/{viewId}`; `POST /api/views/{viewId}/reference` (re-capture from a `frameId`); `GET /api/views/{viewId}/reference.jpg`; `GET|POST /api/views/{viewId}/zones`; `PATCH|DELETE /api/zones/{zoneId}`. Camera ids validated as `^\d{1,3}$` and normalised by zero-padding to two digits; zone payloads capped (≤ 64 points, coordinates in `[0,1]`).
 
@@ -122,7 +121,7 @@ Availability transitions are detected by `features/availability-alerts`, which s
 ## Risks / Trade-offs
 
 - **Small, distant vehicles at 384×216 are hard to detect** → upscale before inference, benchmark models (tasks §4.1), per-zone confidence threshold, hysteresis; document that far-end curbs are less reliable.
-- **Unauthenticated zone editing**: anyone reaching the API can change shared zones → intended for self-hosting/LAN; CORS restricted to `CORS_ORIGIN`; payload validation and size caps. Adding an edit guard later would be a spec change (spec requires no authentication).
+- **Browser-only data**: clearing site storage removes views and zones → provide JSON export/import and recommend backups. The API validates snapshots and isolates active sessions by browser id.
 - **Night/rain breaks feature matching** → CLAHE, multiple brightness-diverse exemplars per view, and "unknown view" is the safe failure (no false availability).
 - **Replicate cost/latency** → analysis only for watched cameras and new images, skip low-quality frames, latest-wins slot, global concurrency cap; `analysis_unavailable` on failures without retry storms.
 - **Replicate cold starts** (tens of seconds on unpopular models) → the image is shown immediately with "analysing"; prefer a model with warm/official deployment in the benchmark.
@@ -132,7 +131,7 @@ Availability transitions are detected by `features/availability-alerts`, which s
 
 ## Migration Plan
 
-Greenfield — no data migration. Rollout: `cp .env.example .env`, set `REPLICATE_API_TOKEN`, `docker compose up --build`. Rollback: `docker compose down` (the `api-data` volume keeps views/zones). `.env.example` loses the Postgres variables; nothing consumes them today.
+Existing local view/zone data was exported once to a JSON snapshot before the old database was removed. New installs use `docker compose up --build`; each user supplies their Replicate key in the web app and can export their configuration from the Data menu. The API container needs no data volume.
 
 ## Open Questions
 

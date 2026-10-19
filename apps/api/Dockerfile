@@ -6,17 +6,15 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
-    DATA_DIR=/data
+    DATA_DIR=/tmp/parking-vision
 
 WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY app ./app
 
-RUN useradd --system --uid 10001 --home /app parking \
-    && mkdir -p /data && chown parking /data
+RUN useradd --system --uid 10001 --home /app parking
 USER parking
-VOLUME ["/data"]
 EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \

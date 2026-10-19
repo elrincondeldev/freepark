@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from app.config import Settings
 
@@ -24,7 +23,6 @@ def test_env_overrides(monkeypatch, tmp_path):
     assert s.poll_interval_seconds == 2.5
     assert s.view_mask == (0.0, 0.0, 0.5, 0.1)
     assert s.detector == "fake"
-    assert s.db_path == Path(tmp_path) / "parking.db"
 
 
 def test_blank_values_fall_back_to_defaults(monkeypatch):

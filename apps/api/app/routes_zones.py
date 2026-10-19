@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 
-from app.db import Zone
+from app.repository import Zone
 from app.services import Services, get_services
 
 router = APIRouter(prefix="/api", tags=["zones"])

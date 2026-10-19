@@ -54,10 +54,16 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await conn.send_json({"type": "error", "message": "invalid Replicate API key"})
                 continue
             token = token or None
-            added = await manager.set_subscriptions(conn, cameras, token)
+            client_id = msg.get("clientId", "")
+            if not isinstance(client_id, str) or (client_id and (
+                len(client_id) > 64 or not client_id.isascii() or not client_id.isalnum()
+            )):
+                await conn.send_json({"type": "error", "message": "invalid client id"})
+                continue
+            added = await manager.set_subscriptions(conn, cameras, token, client_id)
             await conn.send_json({"type": "subscribed", "cameras": sorted(cameras)})
             for camera_id in sorted(added):
-                for replay in manager.replay(camera_id, token):
+                for replay in manager.replay(camera_id, token, client_id):
                     await conn.send_json(replay)
     except WebSocketDisconnect:
         pass

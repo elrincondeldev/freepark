@@ -11,7 +11,7 @@ Finding street parking in Vigo means driving around blind, yet the city already 
 - **Backend** (Python + FastAPI): watches only cameras that at least one open client is subscribed to, detects new images via HTTP conditional requests (`Last-Modified` / `304`), runs vehicle detection through Replicate, recognises which viewpoint the camera is currently showing, computes free curb gaps, and streams results to clients over a WebSocket.
 - **Perspective handling**: cameras rotate between viewpoints. Each camera can hold several stored *views*; every frame is matched to a known view (with small-drift correction) or flagged as an unknown view that needs zones drawn. Availability is only reported for frames whose view is recognised.
 - **Approximate zones, not exact bays**: users draw curb lines (polylines with a tolerance band) where cars can park; vehicles that sit partly inside or outside the band still count. Free space is the length of the gaps between parked vehicles along each line, compared with a perspective-scaled car length.
-- SQLite persistence (Docker volume) for camera views and zones; `.env.example` reworked to drop the unused Postgres variables and add Replicate settings.
+- Browser-owned persistence for cameras, views and zones, with reference images in IndexedDB; the API holds temporary analysis sessions and frames. `.env.example` contains Replicate settings.
 
 ## Capabilities
 

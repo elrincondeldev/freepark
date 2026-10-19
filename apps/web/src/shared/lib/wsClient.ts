@@ -5,6 +5,7 @@ export interface WsClientOptions<TIn> {
   onMessage: (msg: TIn) => void
   /** Message announcing the current topic set; re-sent on every (re)connect. */
   subscribeMessage: (topics: string[]) => unknown
+  beforeSubscribe?: () => Promise<void>
   onState?: (state: ConnectionState) => void
   WebSocketImpl?: typeof WebSocket
   baseDelayMs?: number
@@ -18,12 +19,13 @@ export interface WsClientOptions<TIn> {
  */
 export class WsClient<TIn> {
   private ws: WebSocket | null = null
+  private ready = false
   private topics: string[] = []
   private attempts = 0
   private timer: ReturnType<typeof setTimeout> | null = null
   private closed = false
-  private readonly opts: Required<Omit<WsClientOptions<TIn>, 'onState'>> &
-    Pick<WsClientOptions<TIn>, 'onState'>
+  private readonly opts: Required<Omit<WsClientOptions<TIn>, 'onState' | 'beforeSubscribe'>> &
+    Pick<WsClientOptions<TIn>, 'onState' | 'beforeSubscribe'>
 
   constructor(opts: WsClientOptions<TIn>) {
     this.opts = {
@@ -40,10 +42,24 @@ export class WsClient<TIn> {
     this.opts.onState?.(this.attempts === 0 ? 'connecting' : 'reconnecting')
     const ws = new this.opts.WebSocketImpl(this.opts.url)
     this.ws = ws
+    this.ready = false
     ws.onopen = () => {
       this.attempts = 0
       this.opts.onState?.('open')
-      this.sendSubscribe()
+      if (this.opts.beforeSubscribe) {
+        void this.opts
+          .beforeSubscribe()
+          .catch((error) => console.error(error))
+          .finally(() => {
+            if (this.ws === ws) {
+              this.ready = true
+              this.sendSubscribe()
+            }
+          })
+      } else {
+        this.ready = true
+        this.sendSubscribe()
+      }
     }
     ws.onmessage = (event) => {
       try {
@@ -81,7 +97,7 @@ export class WsClient<TIn> {
   }
 
   private sendSubscribe(): void {
-    if (this.ws && this.ws.readyState === this.opts.WebSocketImpl.OPEN) {
+    if (this.ready && this.ws && this.ws.readyState === this.opts.WebSocketImpl.OPEN) {
       this.ws.send(JSON.stringify(this.opts.subscribeMessage(this.topics)))
     }
   }

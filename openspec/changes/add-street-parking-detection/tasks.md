@@ -8,10 +8,10 @@
 - [x] 1.4 Replace `.env.example` contents (drop Postgres vars; keep `API_PORT=4000`, `CORS_ORIGIN`; add `REPLICATE_API_TOKEN`, `DETECTOR`, `REPLICATE_MODEL`, `REPLICATE_INPUT_TEMPLATE`, `REPLICATE_OUTPUT_FORMAT`, `POLL_INTERVAL_SECONDS`, `MAX_CONCURRENT_PREDICTIONS`, `AVAILABLE_CONFIRM_FRAMES`, `FRAME_RETENTION`, `VIEW_MASK`, `DATA_DIR`) and implement the matching `Settings` class; verify a settings unit test loads defaults and env overrides
 - [ ] 1.5 Capture a fixture set of ~30 frames from cameras 04, 34 and 47 (including at least one viewpoint change if observed, and a night frame) into `apps/api/tests/fixtures/frames/`, with a small script `apps/api/scripts/capture_frames.py`; verify the fixtures load as 384×216 JPEGs in a test
 
-## 2. API persistence (SQLite)
+## 2. API persistence (superseded by browser-owned state)
 
-- [x] 2.1 Implement the SQLite repository with `schema_version` + ordered migrations for `views`, `view_exemplars`, `zones`, `zone_length_samples` under `DATA_DIR` (design D9); verify with pytest that migrations are idempotent and CRUD round-trips
-- [x] 2.2 Implement frame file storage (`/data/frames/{cameraId}/{frameId}.jpg`) with retention pruning that keeps exemplar files; verify a test that writing 25 frames leaves 20 plus exemplars
+- [x] 2.1 Replace the original database repository with an in-memory per-browser session and browser snapshots for views, exemplars, zones and spacing samples; verify CRUD, isolation and snapshot round-trips
+- [x] 2.2 Implement temporary frame file storage (`DATA_DIR/frames/{cameraId}/{frameId}.jpg`) with retention pruning that keeps session exemplar files; verify a test that writing 25 frames leaves 20 plus exemplars
 
 ## 3. Frame ingestion
 
@@ -70,7 +70,7 @@
 
 ## 12. Docker and integration
 
-- [x] 12.1 Write `apps/api/Dockerfile` (uv, non-root, `/data` volume) and `apps/web/Dockerfile` (multi-stage Node build → nginx with `/api` and `/ws` reverse proxy including WebSocket upgrade), rewrite `.dockerignore` so web sources are included, and add `docker-compose.yml` (`api`, `web`, `api-data` volume, `.env`); verify `docker compose up --build` serves the app and `/api/health` through the web origin
+- [x] 12.1 Write `apps/api/Dockerfile` (uv, non-root, temporary frame storage) and `apps/web/Dockerfile` (multi-stage Node build → nginx with `/api` and `/ws` reverse proxy including WebSocket upgrade), rewrite `.dockerignore` so web sources are included, and add `docker-compose.yml` without a persistent API volume; verify `docker compose up --build` serves the app and `/api/health` through the web origin
 - [x] 12.2 End-to-end check with `DETECTOR=fake`: add cameras `47` and `04`, save a view, draw a zone, observe red/green overlays and a toast on availability, reload and confirm cameras persist; record results in the root `README.md` "Getting started" section along with setup steps
 - [x] 12.3 Live check with a real `REPLICATE_API_TOKEN` on cameras `04`, `34`, `47` for ~15 minutes: confirm predictions are created only for new images of watched cameras (compare API logs to `Last-Modified` changes), polling stops when the tab closes, and an unknown view is reported after a viewpoint change; note findings in `apps/api/docs/model-benchmark.md`
 

@@ -1,18 +1,14 @@
-from app.db import MAX_LENGTH_SAMPLES, Repository
+from app.repository import MAX_LENGTH_SAMPLES, Repository
 
 
-def test_migrations_idempotent(tmp_path):
-    path = tmp_path / "p.db"
-    repo = Repository(path)
-    assert repo.schema_version() == 2
-    repo.close()
-    repo = Repository(path)  # re-open runs migrate() again
-    assert repo.migrate() == 2
-    assert repo.schema_version() == 2
+def test_state_is_session_only():
+    repo = Repository()
+    repo.create_view("47", "A")
+    assert Repository().list_views("47") == []
 
 
-def test_view_crud(tmp_path):
-    repo = Repository(tmp_path / "p.db")
+def test_view_crud():
+    repo = Repository()
     v = repo.create_view("47", "Avenue north")
     assert repo.list_views("47") == [v]
     assert repo.list_views("04") == []
@@ -21,8 +17,8 @@ def test_view_crud(tmp_path):
     assert repo.get_view(v.id) is None
 
 
-def test_exemplars_reference_flag(tmp_path):
-    repo = Repository(tmp_path / "p.db")
+def test_exemplars_reference_flag():
+    repo = Repository()
     v = repo.create_view("47", "A")
     repo.add_exemplar(v.id, "a.jpg", 120.0, is_reference=True)
     repo.add_exemplar(v.id, "b.jpg", 40.0)
@@ -32,8 +28,8 @@ def test_exemplars_reference_flag(tmp_path):
     assert repo.all_exemplar_paths() == {"a.jpg", "b.jpg", "c.jpg"}
 
 
-def test_zone_crud_and_cascade(tmp_path):
-    repo = Repository(tmp_path / "p.db")
+def test_zone_crud_and_cascade():
+    repo = Repository()
     v = repo.create_view("47", "A")
     z = repo.create_zone(v.id, "Right curb", [(0.1, 0.9), (0.4, 0.4)], 0.04, 0.01)
     assert z.points == [(0.1, 0.9), (0.4, 0.4)]
@@ -41,16 +37,18 @@ def test_zone_crud_and_cascade(tmp_path):
     assert z2.name == "Right" and z2.min_gap_cars == 1.5
     repo.add_length_samples(z.id, [(0.1, 0.05)])
     repo.update_zone(z.id, points=[(0.0, 1.0), (0.5, 0.5)])
-    assert repo.length_samples(z.id) == []  # geometry change resets learned lengths
+    assert repo.length_samples(z.id) == []
     repo.delete_view(v.id)
-    assert repo.get_zone(z.id) is None  # cascade
+    assert repo.get_zone(z.id) is None
 
 
-def test_length_samples_capped(tmp_path):
-    repo = Repository(tmp_path / "p.db")
+def test_length_samples_capped_and_snapshot():
+    repo = Repository()
     v = repo.create_view("47", "A")
     z = repo.create_zone(v.id, "Z", [(0, 0), (1, 1)], 0.02, 0.02)
     repo.add_length_samples(z.id, [(i / 100, 0.1) for i in range(MAX_LENGTH_SAMPLES + 10)])
-    samples = repo.length_samples(z.id)
+    restored = Repository()
+    restored.restore(repo.export())
+    samples = restored.length_samples(z.id)
     assert len(samples) == MAX_LENGTH_SAMPLES
     assert samples[-1][0] == (MAX_LENGTH_SAMPLES + 9) / 100

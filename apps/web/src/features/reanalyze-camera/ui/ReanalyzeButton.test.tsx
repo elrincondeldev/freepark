@@ -42,7 +42,7 @@ test('re-analysis sends the current user key in a header', async () => {
   })
   render(<ReanalyzeButton cameraId="47" />)
   await userEvent.click(button())
-  expect(headers).toEqual([{ 'Replicate-Api-Key': 'key-a' }])
+  expect(headers).toEqual([expect.objectContaining({ 'Replicate-Api-Key': 'key-a' })])
 })
 
 test('immediate analysis from the API is shown right away', async () => {

@@ -5,6 +5,7 @@ import { AddCameraForm } from '@/features/add-camera'
 import { ReplicateKeyControl } from '@/features/manage-replicate-key'
 import { SoundToggle } from '@/features/toggle-alert-sound'
 import type { ConnectionState } from '@/shared/lib'
+import { DataControl } from './DataControl'
 
 export function AppHeader() {
   const connection = useFeedStore((s) => s.connection)
@@ -25,6 +26,7 @@ export function AppHeader() {
           {hasCameras && <AddCameraForm />}
         </div>
         <div className="ml-auto flex items-center gap-2 sm:ml-0">
+          <DataControl />
           <ReplicateKeyControl />
           <SoundToggle />
         </div>

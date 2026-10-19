@@ -95,7 +95,7 @@ async def reanalyze(
     if replicate_api_key and any(char.isspace() for char in replicate_api_key):
         raise HTTPException(400, "invalid Replicate API key")
     svc.views.invalidate(cam)
-    if svc.manager.requeue(cam, replicate_api_key, fresh):
+    if svc.manager.requeue(cam, replicate_api_key, fresh, svc.client_id):
         response.status_code = 202
         return {"cameraId": cam, "queued": True, "fresh": fresh}
 

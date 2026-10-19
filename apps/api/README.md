@@ -11,8 +11,12 @@ uv run pytest -q
 uv run ruff check .
 ```
 
-Data (SQLite `parking.db`, frames, view exemplars) lives in `DATA_DIR` (default `./data`,
-`/data` in Docker).
+The browser owns durable views, zones and exemplar images. It sends a snapshot to the API
+when opened or reconnected. The API keeps one isolated in-memory session per browser id;
+`DATA_DIR` holds temporary frames and session images (default `./data`, `/tmp/parking-vision`
+in Docker). Restarting the API requires an open browser to reconnect and restore its data.
+Run one API worker per instance: active analysis sessions live in process memory. Separate
+workers need sticky routing to keep a browser on the same worker.
 
 ## Configuration
 
@@ -22,7 +26,7 @@ Every setting is an environment variable (also read from `.env`). See `../../.en
 |---|---|---|
 | `API_PORT` | `4000` | Port used by `npm run dev:api` / Docker |
 | `CORS_ORIGIN` | `http://localhost:5173` | Comma-separated allowed browser origins |
-| `DATA_DIR` | `./data` | SQLite database, frames and exemplar images |
+| `DATA_DIR` | `./data` | Temporary frames and session images |
 | `POLL_INTERVAL_SECONDS` | `5` | Conditional poll interval per watched camera |
 | `FRAME_RETENTION` | `20` | Frames kept per camera (exemplars are stored separately) |
 | `DETECTOR` | `replicate` | `replicate` or `fake` (deterministic boxes, no token needed) |
@@ -68,11 +72,15 @@ half-widths as a fraction of the image **width**, at the end of the line nearer 
 | `POST /api/views/{viewId}/zones` | `{name, points, bandNear, bandFar, minGapCars?}` | `201 Zone`; `422` if < 2 or > 64 points, coords outside `[0,1]`, band ≤ 0 |
 | `PATCH /api/zones/{zoneId}` | any subset; `minGapCars: null` clears the override | `Zone` |
 | `DELETE /api/zones/{zoneId}` | – | `204` |
+| `GET /api/state` | `X-Client-Id` header | Browser snapshot including base64 exemplar images |
+| `GET /api/state/status` | `X-Client-Id` header | Whether this browser's temporary session has been restored |
+| `POST /api/state` | `X-Client-Id` header and snapshot JSON | Restore a browser session after reload |
 
 `View = {id, cameraId, name, createdAt, referenceUrl, exemplarCount, zoneCount}`
 `Zone = {id, viewId, name, points, bandNear, bandFar, minGapCars, updatedAt}`
 
-Creating, editing or deleting views and zones re-analyses the camera's latest frame (reusing its
+Browser-specific view and zone requests include `X-Client-Id`. Creating, editing or deleting
+views and zones re-analyses the camera's latest frame (reusing its
 detections, so no extra prediction).
 
 ## WebSocket `/ws`
@@ -81,7 +89,7 @@ Client → server (send the full set on connect and whenever it changes; ids are
 invalid ones ignored, at most 24):
 
 ```json
-{"type": "subscribe", "cameras": ["47", "04"], "replicateApiKey": "your-key"}
+{"type": "subscribe", "cameras": ["47", "04"], "replicateApiKey": "your-key", "clientId": "browser-id"}
 ```
 
 Server → client:
@@ -114,7 +122,7 @@ Server → client:
 
 The key is optional: without it, frames still stream and analysis reports
 `analysis_disabled` (unless `DETECTOR=fake`). It is held only in memory while the connection
-is active and is never echoed in server messages. Analyses are isolated by key; connections
-using different keys never receive each other's results. On subscribe, the latest
+is active and is never echoed in server messages. Analyses are isolated by key and browser
+id; connections using different settings never receive each other's results. On subscribe, the latest
 `camera_status` (if offline), `frame` and `analysis` for that key are replayed. Polling stops
 when the last connection using that camera and key disconnects.

@@ -8,11 +8,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.config import Settings
-from app.db import Repository
 from app.detection import Detection, DetectionDisabled, DetectionUnavailable, Detector
 from app.monitor import FrameInfo
 from app.occupancy import FrameGeometry, Smoother, evaluate_zones
 from app.quality import assess
+from app.repository import Repository
 from app.view_registry import ViewRegistry, decode_gray
 
 log = logging.getLogger(__name__)

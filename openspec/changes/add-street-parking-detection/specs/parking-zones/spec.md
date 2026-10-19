@@ -50,13 +50,13 @@ The system SHALL let the user move, insert and delete points of an existing zone
 - **WHEN** the user deletes a zone
 - **THEN** it no longer appears in overlays or availability counts
 
-### Requirement: Zones are shared across clients
-Zones and views SHALL be stored by the backend per camera identifier, so every client watching that camera uses the same zones. No authentication SHALL be required to create or edit them.
+### Requirement: Zones belong to each browser
+Zones and views SHALL be stored in each user's browser and restored to an isolated backend analysis session while that browser is connected. A user SHALL be able to export and import their zones, views and reference images without an account.
 
-#### Scenario: Second browser sees zones
+#### Scenario: Second browser has its own zones
 - **WHEN** zones were drawn for camera `47` in one browser and a different browser adds camera `47`
-- **THEN** the second browser shows the same zones and availability without redrawing
+- **THEN** the second browser has no zones until it imports a data export or draws its own
 
 #### Scenario: Zones survive restart
 - **WHEN** the backend container restarts
-- **THEN** all views and zones are still present
+- **THEN** the browser restores its saved views, zones and reference images when it reconnects

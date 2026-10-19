@@ -78,9 +78,6 @@ class Settings(BaseSettings):
     def frames_dir(self) -> Path:
         return self.data_dir / "frames"
 
-    @property
-    def db_path(self) -> Path:
-        return self.data_dir / "parking.db"
 
 
 @lru_cache

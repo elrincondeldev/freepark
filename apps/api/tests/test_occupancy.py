@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-from app.db import Zone
 from app.detection import Detection
 from app.geometry import Polyline, complement, merge_intervals
 from app.occupancy import (
@@ -15,6 +14,7 @@ from app.occupancy import (
     free_runs,
     map_zone,
 )
+from app.repository import Zone
 
 GEOM = FrameGeometry(384, 216)
 IDENTITY = np.eye(3)

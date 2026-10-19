@@ -5,7 +5,7 @@ services:
     build: ./apps/api
     restart: unless-stopped
     environment:
-      DATA_DIR: /data
+      DATA_DIR: /tmp/parking-vision
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
       FRAME_RETENTION: ${FRAME_RETENTION:-20}
@@ -21,8 +21,6 @@ services:
       AVAILABLE_CONFIRM_FRAMES: ${AVAILABLE_CONFIRM_FRAMES:-2}
     ports:
       - "${API_PORT:-4000}:4000"
-    volumes:
-      - api-data:/data
 
   web:
     build:
@@ -33,6 +31,3 @@ services:
       - api
     ports:
       - "${WEB_PORT:-8080}:80"
-
-volumes:
-  api-data:

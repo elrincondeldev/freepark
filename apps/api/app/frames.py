@@ -17,9 +17,11 @@ def make_frame_id(captured_epoch: int, data: bytes) -> str:
 class FrameStore:
     """Frames live at `<root>/frames/<camera>/<frameId>.jpg`; exemplars at `<root>/exemplars/`."""
 
-    def __init__(self, data_dir: Path, retention: int) -> None:
+    def __init__(
+        self, data_dir: Path, retention: int, frames_dir: Path | None = None
+    ) -> None:
         self.data_dir = data_dir
-        self.frames_dir = data_dir / "frames"
+        self.frames_dir = frames_dir or data_dir / "frames"
         self.exemplars_dir = data_dir / "exemplars"
         self.retention = retention
 

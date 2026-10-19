@@ -5,7 +5,8 @@ traffic cameras (`https://camaras.vigo.org/webcam/cam.php?id=NN`), detects vehic
 AI model on [Replicate](https://replicate.com), and marks curb space as **occupied (red)** or
 **available (green)**. It alerts you when a space opens.
 
-- **No accounts.** Your camera list lives in your browser's `localStorage`.
+- **No accounts or server database.** Cameras, views and zones live in your browser;
+  reference images use IndexedDB. Use **Data → Export data** for a portable backup.
 - **Cameras that turn.** Vigo's cameras rotate between a few fixed viewpoints. You save each
   viewpoint once and draw its curb lines; every frame is matched to the right viewpoint
   (small pans are compensated automatically). Unknown viewpoints never report availability.
@@ -14,7 +15,7 @@ AI model on [Replicate](https://replicate.com), and marks curb space as **occupi
 
 ```
 apps/web   React + TypeScript + Tailwind + Framer Motion + Zustand (Vite), Feature-Sliced Design → see apps/web/README.md
-apps/api   Python + FastAPI + OpenCV, SQLite, Replicate   → see apps/api/README.md
+apps/api   Python + FastAPI + OpenCV, Replicate   → see apps/api/README.md
 ```
 
 ## Getting started
@@ -27,7 +28,8 @@ docker compose up --build
 ```
 
 Open <http://localhost:8080>. nginx serves the web app and proxies `/api` and `/ws` to the
-API, which stores views, zones and frames in the `api-data` volume. The API is also exposed
+API. Views and zones are restored from the browser when the app opens; the API keeps only
+temporary analysis state and camera frames. The API is also exposed
 on `localhost:${API_PORT:-4000}`.
 
 ### Local development
@@ -53,9 +55,14 @@ npm run lint        # ESLint + Prettier + Ruff
 
 Use **Add API key** in the header to save your own Replicate key in this browser. You can
 replace or remove it there later. The key is sent to the API over the live connection and
-is not written to the server database. Use HTTPS in production: browser storage is not
+is not persisted by the API. Use HTTPS in production: browser storage is not
 encrypted, and anyone with access to this browser profile or malicious scripts on the
-site could read the key.
+site could read the key. The data export does not include the API key.
+
+The **Data** menu imports and exports the camera list, views, zones, learned spacing samples and their
+reference images as JSON. Import replaces the current browser configuration. Previous
+server-side data must be exported to this format before upgrading; the API no longer reads
+old database files.
 
 1. **Add a camera.** Paste its link (`https://camaras.vigo.org/webcam/cam.php?id=47`) or
    type its number (`47`, `04`). A preview confirms the camera is reachable.

@@ -8,9 +8,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from app.db import Zone
 from app.detection import Detection, suppress_duplicates
 from app.occupancy import FrameGeometry, Smoother, evaluate_zones
+from app.repository import Zone
 
 SCENES = json.loads((Path(__file__).parent / "fixtures/detections/real_scenes.json").read_text())
 GEOM = FrameGeometry(384, 216)
