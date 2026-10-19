@@ -12,3 +12,15 @@ if (typeof window !== 'undefined' && !('PointerEvent' in window)) {
   // @ts-expect-error assigning polyfill
   window.PointerEvent = PointerEventPolyfill
 }
+
+// jsdom has no IntersectionObserver; scroll-triggered animations only need it to exist.
+class NoopIntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return []
+  }
+}
+globalThis.IntersectionObserver ??=
+  NoopIntersectionObserver as unknown as typeof IntersectionObserver

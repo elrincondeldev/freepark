@@ -16,10 +16,16 @@ export function AppHeader() {
     <header className="sticky top-0 z-20 border-b border-line/70 bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-free text-sm font-bold text-white">
-            P
-          </span>
-          <span className="font-semibold tracking-tight">Parking Vision</span>
+          <a
+            href="/"
+            className="flex items-center gap-2.5 rounded-xl"
+            aria-label="Parking Vision home"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-free text-sm font-bold text-white">
+              P
+            </span>
+            <span className="font-semibold tracking-tight">Parking Vision</span>
+          </a>
           <ConnectionPill state={connection} />
         </div>
         <div className="order-3 flex w-full justify-end sm:order-none sm:ml-auto sm:w-auto">

@@ -27,7 +27,8 @@ cp .env.example .env          # optional: set DETECTOR=fake for local UI work
 docker compose up --build
 ```
 
-Open <http://localhost:8080>. nginx serves the web app and proxies `/api` and `/ws` to the
+Open <http://localhost:8080> for the landing page, or <http://localhost:8080/app> for the app
+itself. nginx serves the web app and proxies `/api` and `/ws` to the
 API. Views and zones are restored from the browser when the app opens; the API keeps only
 temporary analysis state and camera frames. The API is also exposed
 on `localhost:${API_PORT:-4000}`.
